@@ -106,7 +106,7 @@ namespace Photos.Desktop
 
             DesktopImageLoader.Register();
             WinFormsDialogs.Register();
-            Core.Utils.Trace($"Displays detected: {string.Join(", ", ScreenDetection.GetDisplayBounds())}");
+            Core.Utils.Log($"Displays detected: {string.Join(", ", ScreenDetection.GetDisplayBounds())}");
             photoProvider = providerPromise.Result;
 
             bool transparentBackground = false;

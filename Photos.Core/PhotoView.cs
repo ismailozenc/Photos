@@ -494,6 +494,7 @@ namespace Photos.Core
         {
             _slideshow = !_slideshow;
             _slideshowTimer.Restart();
+            Utils.Log(_slideshow ? "Slideshow started" : "Slideshow stopped");
             InfoToast.Show(_slideshow ? "Slideshow on (S to stop)" : "Slideshow off", 2);
         }
 
