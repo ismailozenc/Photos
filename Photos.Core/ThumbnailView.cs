@@ -136,6 +136,7 @@ namespace Photos.Core
                     if (isDoubleClick)
                         photoProvider.SelectPhoto();
                 },
+                OnContext = () => ItemContextRequested?.Invoke(photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex),
             };
 
             ScrollContainer.ScrollPositionHint = () =>
@@ -155,6 +156,7 @@ namespace Photos.Core
             _dateTimeFormat = CultureInfo.CurrentCulture.DateTimeFormat.LongDatePattern;
             _dateTimeFormat = _dateTimeFormat.Replace("dddd", "").Replace("dddd", "").Trim(',').Trim();
         }
+        public event Action<int> ItemContextRequested;
         const int DoubleClickMs = 450;
         int _lastClickIdx = -1;
         DateTime _lastClickUtc;

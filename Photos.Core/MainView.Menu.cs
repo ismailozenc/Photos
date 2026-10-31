@@ -95,6 +95,66 @@ namespace Photos.Core
                 MainToast.Show("Wrong password");
         }
 
+        /// <summary>Right-click menu for a thumbnail in browse mode.</summary>
+        void ShowItemMenu(int idx)
+        {
+            var file = photoProvider.GetFile(idx);
+            if (file == null || !file.IsIndexed())
+                return;
+
+            mainMenu.Show(m =>
+            {
+                m.Title = "Image";
+                m.Items.Add(new MenuItem() { Text = "Info", Submenu = x => _photoView.BuildImageInfo(x, file) });
+                m.Items.Add(new MenuItem()
+                {
+                    Text = photoProvider.DB.GetAdditionalImageData(file).IsFavorite ? "Remove from favorites" : "Add to favorites",
+                    OnClick = () => _photoView.ToggleFavorite(file),
+                    ReturnLevel = Menu.CloseMenuLevel,
+                });
+                AddDeleteEntries(m, file);
+            });
+        }
+
+        /// <summary>Delete, or restore in the deleted view. No confirmation is asked here.</summary>
+        void AddDeleteEntries(MenuDef m, FileRecord file)
+        {
+            var restoring = photoProvider.ShowDeleted;
+            var entries = new List<MenuItem>();
+            for (int i = 0; i < file.Src.Length; i++)
+            {
+                var index = i;
+                var dir = photoProvider.DB.Directories.GetValue(file.Src[i].D);
+                var fullPath = file.Src[i].GetFullPath(photoProvider);
+                if (!dir.IsLocal() || !File.Exists(fullPath.osPath))
+                    continue;
+
+                entries.Add(new MenuItem()
+                {
+                    Text = $"{(restoring ? "Restore" : "Delete")} {fullPath.display}",
+                    OnClick = () => RunFileAction(
+                        () => restoring ? photoProvider.RestoreFromDeleted(file, index) : photoProvider.MoveToDeleted(file, index),
+                        restoring ? "Restored" : "Moved to deleted images"),
+                    ReturnLevel = Menu.CloseMenuLevel,
+                });
+            }
+
+            if (entries.Count == 1)
+                m.Items.Add(entries[0]);
+            else if (entries.Count > 1)
+                m.Items.Add(new MenuItem()
+                {
+                    Text = restoring ? "Restore a copy" : "Delete a copy",
+                    Submenu = s => s.Items.AddRange(entries),
+                });
+        }
+
+        void RunFileAction(Func<string> action, string successText)
+        {
+            var error = action();
+            MainToast.Show(error == null ? successText : $"Failed: {error}");
+        }
+
         void ShowDebugMenu(MenuDef menu)
         {
             var debug = new List<MenuItem>

@@ -498,9 +498,10 @@ namespace Photos.Core
             SwitchImage(1, false);
         }
 
-        private void ToggleFavorite()
+        private void ToggleFavorite() => ToggleFavorite(CurrentFile);
+
+        public void ToggleFavorite(FileRecord f)
         {
-            var f = CurrentFile;
             var dat = photoProvider.DB.GetAdditionalImageData(f);
             dat.IsFavorite = !dat.IsFavorite;
             photoProvider.DB.SetAdditionalImageData(f, dat);
@@ -1010,10 +1011,11 @@ namespace Photos.Core
             _lastFile = null;
         }
 
-        void ShowImageInfoMenu(MenuDef m)
+        void ShowImageInfoMenu(MenuDef m) => BuildImageInfo(m, CurrentFile);
+
+        public void BuildImageInfo(MenuDef m, FileRecord file)
         {
             m.Title = "Image info";
-            var file = photoProvider.GetFile(photoProvider.Idx);
             var thumb = photoProvider.GetFullThumbnail(file);
             m.Items.AddRange(new List<MenuItem>()
             {
@@ -1032,7 +1034,8 @@ namespace Photos.Core
                 m.Items.Add(SetupItem(new() { Text = $"{key}: {text}" }));
             }
 
-            m.Items.Add(SetupItem(new() { Text = $"Rendered as: {_lastRenderInfo.Width}x{_lastRenderInfo.Height} {_lastRenderInfo.BytesSize64 >> 20} MB" }));
+            if (file == CurrentFile)
+                m.Items.Add(SetupItem(new() { Text = $"Rendered as: {_lastRenderInfo.Width}x{_lastRenderInfo.Height} {_lastRenderInfo.BytesSize64 >> 20} MB" }));
 
             var lo = FileRecord.LoadDegree(file.GetOptional(OptionalKeys.Lon));
             var la = FileRecord.LoadDegree(file.GetOptional(OptionalKeys.Lat));

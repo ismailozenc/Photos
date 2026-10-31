@@ -258,7 +258,7 @@ namespace Photos.Lib
             return pos.HasValue ? ctx.TotalMatrix.MapRect(OuterRect).Contains(pos.Value) : false;
         }
 
-        public void DetectClick(libMouseEvent e, Action onClick)
+        public void DetectClick(libMouseEvent e, Action onClick, Action onContext = null)
         {
             if (Window.ManualClickDetection)
             {
@@ -269,6 +269,11 @@ namespace Photos.Lib
                     {
                         Invalidate();
                         onClick?.Invoke();
+                    }
+                    else if (e.Kind == libMouseEventKind.ContextUp)
+                    {
+                        Invalidate();
+                        onContext?.Invoke();
                     }
                 }
             }

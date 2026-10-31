@@ -179,6 +179,7 @@ namespace Photos.Core
             };
 
             _photoView.MainMenu = mainMenu;
+            ThumbnailView.ItemContextRequested += ShowItemMenu;
 
             _sizeSlider = new ThumbnailSizeSlider()
             {

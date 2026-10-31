@@ -274,12 +274,12 @@ namespace Photos.Desktop
 
         private void Game_MouseUp(MouseButtonEventArgs obj)
         {
-            if (obj.Button != MouseButton.Left) // right-click selection is removed
+            if (obj.Button != MouseButton.Left && obj.Button != MouseButton.Right)
                 return;
 
             _window.RouteMouseEvent(new libMouseEvent(downEvent)
             {
-                Kind = libMouseEventKind.Up,
+                Kind = obj.Button == MouseButton.Right ? libMouseEventKind.ContextUp : libMouseEventKind.Up,
                 CurrentPoint = MousePosition.ToSK(),
             });
 

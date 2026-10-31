@@ -54,6 +54,7 @@ namespace Photos.Lib
         Wheel,
         FreeMove,
         Up,
+        ContextUp,
         Down,
         Scale
     }
