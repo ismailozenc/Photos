@@ -128,7 +128,7 @@ namespace Photos.Desktop
                 string name = rel.Length == 0 ? "<root>" : rel.Split('\\', '/').Last();
 
                 bool isPrivate = IsPrivateRow(row.Id);
-                bool active = _group != null && _provider.FilterService.IsFilterActive(_group, row);
+                bool active = _provider.TrashFolderIds.Contains(row.Id) ? _provider.ShowDeleted : _group != null && _provider.FilterService.IsFilterActive(_group, row);
                 float baseline = top + RowHeight * 0.7f;
                 var namePaint = isPrivate ? privatePaint : active ? activePaint : textPaint;
                 canvas.DrawText(name, Padding + depth * IndentStep, baseline, font, namePaint);
@@ -244,6 +244,11 @@ namespace Photos.Desktop
 
         void Toggle(int index)
         {
+            if (index >= 0 && index < _rows.Count && _provider.TrashFolderIds.Contains(_rows[index].Id))
+            {
+                _provider.SetShowDeleted(!_provider.ShowDeleted);
+                return;
+            }
             if (_group == null || index < 0 || index >= _rows.Count)
                 return;
             _provider.FilterService.ToggleFilters(_group, _rows[index]);

@@ -216,7 +216,7 @@ namespace Photos.Core
                 new MenuItem()
                 {
                     Icon = IconStore.Trash3,
-                    Text = "Delete",
+                    Text = photoProvider.ShowDeleted ? "Restore" : "Delete",
                     OnClick = Trash,
                 },
                 new MenuItem()
@@ -474,6 +474,11 @@ namespace Photos.Core
 
         private void ToggleSlideshow()
         {
+            if (!_slideshow && photoProvider.ShowDeleted)
+            {
+                InfoToast.Show("Deleted images are not shown in slideshows", 2);
+                return;
+            }
             _slideshow = !_slideshow;
             _slideshowTimer.Restart();
             Utils.Log(_slideshow ? "Slideshow started" : "Slideshow stopped");
@@ -929,45 +934,47 @@ namespace Photos.Core
                 return;
             }
 
-            var delMenu = new List<MenuItem>();
-            foreach (var item in file.Src)
+            var entries = new List<MenuItem>();
+            for (int i = 0; i < file.Src.Length; i++)
             {
-                var dir = photoProvider.DB.Directories.GetValue(item.D);
-                var fullPath = item.GetFullPath(photoProvider);
-                if (dir.SourceId == 0 && File.Exists(fullPath.osPath))
-                {
-                    delMenu.Add(new MenuItem()
+                var index = i;
+                var dir = photoProvider.DB.Directories.GetValue(file.Src[i].D);
+                var fullPath = file.Src[i].GetFullPath(photoProvider);
+                if (!dir.IsLocal() || !File.Exists(fullPath.osPath))
+                    continue;
+
+                if (photoProvider.ShowDeleted)
+                    entries.Add(new MenuItem()
+                    {
+                        Text = $"Restore {fullPath.display}",
+                        Submenu = m => Menu.Confirm(m, $"Yes, restore {fullPath.display}",
+                            () => RunFileAction(() => photoProvider.RestoreFromDeleted(file, index), "Restored"), okReturnLevel: Menu.CloseMenuLevel)
+                    });
+                else
+                    entries.Add(new MenuItem()
                     {
                         Text = $"Delete {fullPath.display}",
-                        Submenu = m => Menu.Confirm(m, $"Yes, delete {fullPath.display}", () =>
-                        {
-                            photoProvider.DeleteSourceFile(fullPath.osPath, file).ContinueWith(x => Window.Run(() =>
-                            {
-                                MainToast.Show(x.Result == null ? "File deleted" : $"Delete failed: {x.Result}");
-
-                                if (x.Result == null)
-                                {
-                                    photoProvider.DB.RemoveSingleSource(file, item);
-                                    photoProvider.EnqueueRefreshDisplayOrder();
-                                }
-                            }));
-                        }, okReturnLevel: Menu.CloseMenuLevel)
+                        Submenu = m => Menu.Confirm(m, $"Yes, move to deleted images: {fullPath.display}",
+                            () => RunFileAction(() => photoProvider.MoveToDeleted(file, index), "Moved to deleted images"), okReturnLevel: Menu.CloseMenuLevel)
                     });
-                }
             }
 
             MainMenu.Show(m =>
             {
-                if (delMenu.Count == 1)
-                    delMenu.Single().Submenu(m);
+                if (entries.Count == 1)
+                    entries.Single().Submenu(m);
                 else
                 {
-                    m.Title = "Choose a copy to delete";
-                    m.Items.AddRange(delMenu);
+                    m.Title = photoProvider.ShowDeleted ? "Choose a copy to restore" : "Choose a copy to delete";
+                    m.Items.AddRange(entries);
                 }
             });
+        }
 
-
+        void RunFileAction(Func<string> action, string successText)
+        {
+            var error = action();
+            MainToast.Show(error == null ? successText : $"Failed: {error}");
         }
 
         private FileRecord CurrentFile => photoProvider.GetFile(photoProvider.Idx);

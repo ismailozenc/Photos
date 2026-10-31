@@ -151,14 +151,14 @@ namespace Photos.Core
                 UpdateInternal(FileRecord.Clone(item, newSrc), item);
         }
 
-        internal void RemoveSingleSource(FileRecord f, SourceRecord s)
+        /// <summary>Points one source of a file at another directory and file name, e.g. after a move.</summary>
+        internal void ReplaceSource(FileRecord file, int srcIndex, int dirIdx, string fileName)
         {
-            if (!f.IsIndexed())
-                throw new Exception("bad file");
-
-            var filter = new ArrayFilter<SourceRecord>(x => x != s);
+            var src = (SourceRecord[])file.Src.Clone();
+            src[srcIndex] = src[srcIndex] with { D = dirIdx, FN = fileName };
             lock (_files)
-                FilterFileSources(filter, f);
+                UpdateInternal(FileRecord.Clone(file, src), file);
+            IsDirty = true;
             SaveFiles();
         }
 

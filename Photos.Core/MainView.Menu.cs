@@ -34,6 +34,13 @@ namespace Photos.Core
                 menu.Items.Add(new() { Text = "Thumbnail display size", Submenu = ShowThumbnailDisplaySizeMenu });
             }
 
+            if (photoProvider.HasDeletedImages || photoProvider.ShowDeleted)
+                menu.Items.Add(new()
+                {
+                    Text = photoProvider.ShowDeleted ? "Back to library" : "Deleted images",
+                    OnClick = () => photoProvider.SetShowDeleted(!photoProvider.ShowDeleted),
+                });
+
             if (photoProvider.HasPrivateFolders)
                 menu.Items.Add(new()
                 {

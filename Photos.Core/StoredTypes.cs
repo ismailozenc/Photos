@@ -345,6 +345,9 @@ namespace Photos.Core.StoredTypes
         /// <summary>Folder ids marked private (see PrivateFolderRules). Stored with the added folders.</summary>
         [Key("pf")]
         public string[] PrivateFolders = Array.Empty<string>();
+        /// <summary>Deleted photos as "trashed full path|original full path". Restored entries are removed.</summary>
+        [Key("dor")]
+        public string[] DeletedOriginals = Array.Empty<string>();
         [Key("di")]
         public string[] Dirs;
         [Key("fi2")]

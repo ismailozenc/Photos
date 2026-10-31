@@ -133,31 +133,6 @@ namespace Photos.Core
             initTask.DieOnError();
         }
 
-        public async Task<string> DeleteSourceFile(string fullPath, FileRecord file)
-        {
-            string res;
-            if (DeleteSourceFileImpl == null)
-            {
-                try
-                {
-                    File.Delete(fullPath);
-                    res = null;
-                }
-                catch (Exception ex)
-                {
-                    res = ex.Message;
-                }
-            }
-            else
-                res = await DeleteSourceFileImpl(fullPath);
-
-            if (res == null && IsSingleFolderMode)
-                lock (_lock)
-                    _folderViewList = _folderViewList.Where(x => x != file).ToList();
-
-            return res;
-        }
-
         public volatile int MinPreloadImage, MaxPreloadImage;
         public event Action OnBackgroundWorker;
         void BackgroundLoader()
@@ -298,8 +273,6 @@ namespace Photos.Core
             RestartBackgroundTasks(null);
         }
 
-        public Func<string, Task<string>> DeleteSourceFileImpl { private get; set; }
-
         public void UpdateLibraryMaybe(IndexTaskConfig cfg = null)//(bool quick, bool forceMetaRefresh = false)
         {
             cfg ??= new IndexTaskConfig();
@@ -337,11 +310,11 @@ namespace Photos.Core
                 var files = GetLibraryFiles(out var dirs);
                 TotalCount = files.Count;
 
-                FilterService.IsHidden = IsHiddenFile;
+                FilterService.IsHidden = f => IsPrivateHidden(f) || IsTrashed(f);
                 if (!skipFilters)
                     FilterService.RefreshFilters(files, dirs.Where(x => x != null), initTask != null);
 
-                files = files.Where(f => !IsHiddenFile(f)).ToList(); // private folders stay out until unlocked
+                files = files.Where(f => !IsPrivateHidden(f) && IsTrashed(f) == ShowDeleted).ToList(); // private folders and the open view
                 FilterService.FilterFiles(files);
 
                 if (FilterService.CurrentSortMode == SortModeEnum.Filename)
@@ -417,6 +390,121 @@ namespace Photos.Core
             }
         }
 
+        public const string DeletedFolderName = "deleted images";
+
+        /// <summary>True while the deleted-images view is shown instead of the library.</summary>
+        public bool ShowDeleted { get; private set; }
+
+        public void SetShowDeleted(bool show)
+        {
+            if (ShowDeleted == show)
+                return;
+            ShowDeleted = show;
+            EnqueueRefreshDisplayOrder();
+        }
+
+        Dictionary<string, string> _deletedMap; // trashed path (lower case) -> original path; reset when the setting changes
+
+        Dictionary<string, string> DeletedMap => _deletedMap ??= (DB.Settings.DeletedOriginals ?? Array.Empty<string>())
+            .Select(x => x.Split('|')).Where(x => x.Length == 2)
+            .GroupBy(x => x[0].ToLowerInvariant()).ToDictionary(g => g.Key, g => g.Last()[1]);
+
+        public bool HasDeletedImages => DeletedMap.Count > 0;
+
+        /// <summary>Folder ids of the deleted-images folders, as the folder list names them.</summary>
+        public IEnumerable<string> TrashFolderIds => DeletedMap.Keys
+            .Select(p => System.IO.Path.GetDirectoryName(p)).Where(d => d != null).Distinct().Select(d => "0/" + d);
+
+        /// <summary>True for a photo that was moved to a deleted-images folder.</summary>
+        public bool IsTrashed(FileRecord file)
+        {
+            var map = DeletedMap;
+            return map.Count > 0 && file.Src.Any(s => map.ContainsKey(DB.Directories.GetValue(s.D).CombinePath(s).ToLowerInvariant()));
+        }
+
+        /// <summary>Moves a local photo into its library's deleted-images folder. Nothing is overwritten.</summary>
+        public string MoveToDeleted(FileRecord file, int srcIndex)
+        {
+            var src = file.Src[srcIndex];
+            var dir = DB.Directories.GetValue(src.D);
+            var fullPath = dir.CombinePath(src);
+            if (!dir.IsLocal() || !File.Exists(fullPath))
+                return "File not found";
+
+            var trashDir = Path.Combine(LibraryRootOf(fullPath), DeletedFolderName);
+            var target = UniquePath(trashDir, src.FN);
+            try
+            {
+                Directory.CreateDirectory(trashDir);
+                File.Move(fullPath, target);
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+
+            var trashDirIdx = DB.Directories.GetIndex(new DirectoryRecord() { Directory = trashDir, SourceId = 0 });
+            DB.Settings = DB.Settings with { DeletedOriginals = (DB.Settings.DeletedOriginals ?? Array.Empty<string>()).Append($"{target}|{fullPath}").ToArray() };
+            _deletedMap = null;
+            DB.ReplaceSource(file, srcIndex, trashDirIdx, Path.GetFileName(target));
+
+            if (IsSingleFolderMode)
+                lock (_lock)
+                    _folderViewList = _folderViewList.Where(x => x != file).ToList();
+            EnqueueRefreshDisplayOrder();
+            return null;
+        }
+
+        /// <summary>Moves a deleted photo back to the folder it came from. A name clash gets a new name.</summary>
+        public string RestoreFromDeleted(FileRecord file, int srcIndex)
+        {
+            var src = file.Src[srcIndex];
+            var trashed = DB.Directories.GetValue(src.D).CombinePath(src);
+            if (!DeletedMap.TryGetValue(trashed.ToLowerInvariant(), out var original))
+                return "The original folder is unknown";
+
+            var originalDir = Path.GetDirectoryName(original);
+            try
+            {
+                Directory.CreateDirectory(originalDir);
+                var target = UniquePath(originalDir, Path.GetFileName(original));
+                File.Move(trashed, target);
+                var originalDirIdx = DB.Directories.GetIndex(new DirectoryRecord() { Directory = originalDir, SourceId = 0 });
+                DB.ReplaceSource(file, srcIndex, originalDirIdx, Path.GetFileName(target));
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+
+            DB.Settings = DB.Settings with { DeletedOriginals = (DB.Settings.DeletedOriginals ?? Array.Empty<string>())
+                .Where(x => !x.StartsWith(trashed + "|", StringComparison.OrdinalIgnoreCase)).ToArray() };
+            _deletedMap = null;
+            EnqueueRefreshDisplayOrder();
+            return null;
+        }
+
+        /// <summary>The added library folder that contains the file, or the file's own folder if none does.</summary>
+        string LibraryRootOf(string fullPath)
+        {
+            var root = GetDirs()
+                .Select(d => d.TrimEnd('\\', '/'))
+                .Where(d => fullPath.StartsWith(d + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(d => d.Length)
+                .FirstOrDefault();
+            return root ?? System.IO.Path.GetDirectoryName(fullPath);
+        }
+
+        static string UniquePath(string dir, string fileName)
+        {
+            var target = Path.Combine(dir, fileName);
+            var stem = Path.GetFileNameWithoutExtension(fileName);
+            var ext = Path.GetExtension(fileName);
+            for (int i = 1; File.Exists(target); i++)
+                target = Path.Combine(dir, $"{stem} ({i}){ext}");
+            return target;
+        }
+
         /// <summary>True after the password was entered in this session. Private folders stay hidden until then.</summary>
         public bool PrivateUnlocked { get; private set; }
 
@@ -426,7 +514,7 @@ namespace Photos.Core
         public bool HasPrivateFolders => PrivateFolderIds.Count > 0;
 
         /// <summary>True when a file must not be shown: it lies in a private folder and the session is locked.</summary>
-        public bool IsHiddenFile(FileRecord file)
+        public bool IsPrivateHidden(FileRecord file)
         {
             if (PrivateUnlocked || !HasPrivateFolders)
                 return false;

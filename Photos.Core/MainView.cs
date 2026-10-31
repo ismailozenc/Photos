@@ -110,7 +110,7 @@ namespace Photos.Core
             {
                 Link = ButtonPanel.Attach(),
                 Icon = { Const = IconStore.Play },
-                OnClick = () => SlideshowRequested?.Invoke(),
+                OnClick = RequestSlideshow,
                 Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled && photoProvider.DisplayedCount > 0 }
             };
 
@@ -338,7 +338,7 @@ namespace Photos.Core
             else if (e.Key == libKeys.S && ThumbnailView.Enabled && !photoProvider.IsInitRunning && photoProvider.DisplayedCount > 0)
             {
                 e.Consume();
-                SlideshowRequested?.Invoke();
+                RequestSlideshow();
             }
         }
 
@@ -354,6 +354,14 @@ namespace Photos.Core
                 _compareView.Close();
             else if (_photoView.Enabled)
                 _photoView.GoBack();
+        }
+
+        void RequestSlideshow()
+        {
+            if (photoProvider.ShowDeleted)
+                MainToast.Show("Deleted images are not shown in slideshows");
+            else
+                SlideshowRequested?.Invoke();
         }
 
         private void SwitchView()
