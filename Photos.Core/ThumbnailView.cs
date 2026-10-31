@@ -100,9 +100,7 @@ namespace Photos.Core
                 Link = imgReplicator.Attach(),
                 Image = () =>
                 {
-                    //var farJump = Math.Abs(lastScrollOffsetY - ScrollContainer.ScrollOffsetY) > Size.Height;
 
-                    //var y = groupContainer.Rect().Top + imgReplicator.Children[0].Rect().Top - ScrollContainer.ScrollOffsetY;
                     var imgIndex = photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex;
                     minImgIdx = Math.Min(minImgIdx, imgIndex);
                     maxImgIdx = Math.Max(maxImgIdx, imgIndex);

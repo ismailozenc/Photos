@@ -59,8 +59,6 @@ namespace Photos.Core
         public event Action IndexChanged;
         Task indexTask, initTask, backgroundLoaderTask;
         volatile bool _shutdown;
-        public bool ShutdownRequested => _shutdown;
-
         readonly object _lock = new();
         public Storage DB { get; private set; }
         public bool FolderLibraryMode { get; private set; }
@@ -594,19 +592,6 @@ namespace Photos.Core
         }
 
         
-
-        public (string name, string path, byte[] data) GetImageForSharing(int idx)
-        {
-            var file = GetFile(idx);
-            using var data = Indexer.GetFullImage(file);
-            var fn = file.Src[0].FN;
-            if (data != null && DB.Directories.GetValue(data.LoadedSource.D).IsLocal()) // local source
-                return (fn, data.LoadedSource.GetFullPath(this).osPath, null);
-            else if (data != null) // remote source
-                return (fn, null, data.Data.ToArray());
-
-            return (Path.ChangeExtension(fn, ".jpg"), null, DB.Thumbnails.Read(file.T, file.TS)); // failed to load => return thumbnail
-        }
 
         public List<FileRecord> GetFiles(IEnumerable<int> idxs)
         {

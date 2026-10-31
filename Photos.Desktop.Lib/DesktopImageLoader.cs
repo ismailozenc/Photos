@@ -27,9 +27,6 @@ namespace Photos.Desktop
                 image.Read(data.Data.Span);
             data.Width = (int)image.Width;
             data.Height = (int)image.Height;
-            //var scale = scaler(info, true);
-            //if (scale != 1f)
-            //    image.Resize((int)Math.Round(info.Width / scale), (int)Math.Round(info.Height / scale));
 
             using var unsafeBuf = image.GetPixelsUnsafe();
             var buf = unsafeBuf.ToByteArray(PixelMapping.RGBA);
@@ -37,9 +34,7 @@ namespace Photos.Desktop
             var pix = data.Bitmap.GetPixels(out var len);
             Marshal.Copy(buf, 0, pix, (int)len);
             //}
-            //catch (Exception ex)
             //{
-            //    Core.Utils.TraceError(ex);
             //}
         }
 
@@ -61,7 +56,6 @@ namespace Photos.Desktop
                 </policymap>
                 """;
 
-                //MagickNET.Log += (sender, e) => Debug.WriteLine(e.Message);
                 //MagickNET.SetLogEvents(LogEvents.Resource); // LogEvents.Cache | LogEvents.Blob | 
                 MagickNET.Initialize(configFiles);
 

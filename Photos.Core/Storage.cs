@@ -34,7 +34,6 @@ namespace Photos.Core
         private readonly string _filesFileName, _settingsFileName, _additionalFileName;
         public BinFile Thumbnails, MicroThumbnails;
         private readonly string _path;
-        public string MainPath => _path;
         public SyncSource[] SyncSources { get; internal set; }
         public FilesSettings FilesSettings;
 
@@ -55,8 +54,6 @@ namespace Photos.Core
                 throw new ArgumentException();
 
             dat.TimeStamp = FileRecord.TimeTo(DateTime.UtcNow);
-            //if ((dat.Orientation == (int)SKEncodedOrigin.TopLeft || dat.Orientation == 0) && !dat.IsFavorite)
-            //    AdditionalImageData = AdditionalImageData.Remove(file.Sig);
             //else
             lock (_additionalImageDataLock)
             {
@@ -218,7 +215,6 @@ namespace Photos.Core
 
                 foreach (var item in header.Files)
                     AddInternal(item);
-                //_files = header.Files.ToDictionary(x => x.GetIdentity());
                 Thumbnails = new BinFile(_path, "large.bin", header.ThumbnailsPos);
                 MicroThumbnails = new BinFile(_path, "tiny.bin", header.MicroThumbnailsPos);
                 SyncSources = header.SyncSources ?? Array.Empty<SyncSource>();
@@ -418,7 +414,6 @@ namespace Photos.Core
             using (var file = CompressMaybe(baseStream = File.Create(path + TmpSuffix)))
             {
                 Serialize(hdr, file);
-                //file.Flush();
                 if (baseStream.Length == 0)
                     throw new Exception("File is empty");
             }
@@ -430,17 +425,14 @@ namespace Photos.Core
         public static void Serialize<T>(T obj, Stream file)
         {
             MessagePackSerializer.Serialize(file, obj, options: SerializerOptions);
-            //JsonSerializer.Serialize(file, obj, new JsonSerializerOptions()
             //{
             //    IncludeFields = true,
             //    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault,
             //    IgnoreReadOnlyProperties = true
-            //});
         }
 
         Stream CompressMaybe(FileStream fs)
         {
-            //return fs.CanWrite ? new BrotliStream(fs, CompressionLevel.Optimal) : fs;
 
             if (Compress)
                 return fs.CanWrite ? new BrotliStream(fs, CompressionLevel.Optimal) : new BrotliStream(fs, CompressionMode.Decompress);

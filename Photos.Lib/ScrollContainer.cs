@@ -101,10 +101,7 @@ namespace Photos.Lib
             {
                 e.Consume(this);
             }
-            //else if (_scrollerArea.Contains(e.CurrentPoint) && e.Kind == libMouseEventKind.Click)
             //{
-            //    ScrollOffsetY = (int)((e.CurrentPoint.Y - _scrollerArea.Top) / _scrollerArea.Height * GetMaxScrollOffsetY());
-            //    e.Consume(this);
             //}
             else if (e.Kind == libMouseEventKind.Wheel)
             {
@@ -204,9 +201,7 @@ namespace Photos.Lib
                 ctx.DrawRect(ScrollerPos, Foreground);
             else
             {
-                //ctx.DrawRect(ScrollerPos, paint);
                 var rOval = ScrollerPos;
-                //rOval.Right += rOval.Width;
                 rOval.Offset(rOval.Width * 0.4f, 0);
                 ctx.DrawOval(rOval, Foreground);
 

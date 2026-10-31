@@ -259,7 +259,6 @@ namespace Photos.Core
                 IndexUpdateRequest?.Invoke();
             }
 
-            //SetWorkStatus();
             _firstIndexFinished.TrySetResult();
         }
 

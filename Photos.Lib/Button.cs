@@ -81,7 +81,6 @@ namespace Photos.Lib
                 color = SKColors.Orange;
 
             TextLabel.Foreground.Color = color;
-            //CornerRadius = (int)rect.Width/ 2;
             var roundRect = new SKRoundRect(rect, CornerRadius);
             ctx.DrawRoundRect(roundRect, IsHighlighted ? Highlighted : Background);
 

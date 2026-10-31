@@ -13,8 +13,6 @@ namespace Photos.Lib
         public float Left,Top, Right, Bottom;
 
         public readonly float TotalWidth => Right + Left;
-        public readonly float TotalHeight => Top + Bottom;
-
         public PaddingDef(float left = 0, float top = 0, float right = 0, float bottom = 0)
         {
             Left = left;
@@ -23,14 +21,12 @@ namespace Photos.Lib
             Bottom = bottom;
         }
 
-        //public static implicit operator float(PaddingDef v) => v.Top;
         public static implicit operator PaddingDef(float v) => new (v, v, v, v);
 
     }
 
     public class BaseView : IDisposable
     {
-        //public static SKTypeface DefaultTypeface = SKTypeface.Default;
 
         public WindowAdapter Window { get; internal set; }
         public Val<PaddingDef> Padding = new(10);
@@ -46,7 +42,6 @@ namespace Photos.Lib
             Background = new() { IsAntialias = true };
         }
 
-        //protected virtual bool OnLayout() => true;
         public event Action OnAfterLayout;
 
         Func<SKRect, SKRect> _adjustPos;
@@ -72,7 +67,6 @@ namespace Photos.Lib
             RenderPadding = Padding.Value;
             InnerRect = OuterRect.ApplyPadding(RenderPadding);
 
-            //if (OnLayout())
             LayoutChildren();
 
             OnAfterLayout?.Invoke();
@@ -83,7 +77,6 @@ namespace Photos.Lib
 
         }
 
-        //public Func<SKRect> Rect { get;  set; }
 
         public SKRect Position { get; private set; }
         public PaddingDef RenderPadding { get; private set; }
@@ -101,8 +94,6 @@ namespace Photos.Lib
         public object LayoutInfo;
 
         public (BaseView, object) Link { set => AttachToParent(value.Item1, value.Item2); }
-
-        public (BaseView, object) LinkFirst { set => AttachToParent(value.Item1, value.Item2, 0); }
 
         void AttachToParent(BaseView parent, object info, int index = -1)
         {
@@ -135,16 +126,8 @@ namespace Photos.Lib
             }
         }
 
-        //public void AddChildDynamic(BaseView child, int pos = -1)
         //{
-        //    if (child._parent != null)
-        //        throw new InvalidOperationException();
-        //    child._parent = this;
-        //    if (pos < 0)
-        //        _children.Add(child);
         //    else
-        //        _children.Insert(pos, child);
-        //    Window.InitializeInternal(child);
         //}
 
         public void RemoveChildren(Predicate<BaseView> filter) => _children.RemoveAll(x =>
@@ -185,8 +168,6 @@ namespace Photos.Lib
                     continue;
 
                 var rect = item.Position;
-                //if (rect.Width < 0 || rect.Height < 0)
-                //    throw new InvalidOperationException("negative size");
 
                 using var restore = new SKAutoCanvasRestore(ctx);
 
@@ -198,7 +179,6 @@ namespace Photos.Lib
 
                 item.RouteRenderFrame(ctx);
 
-                //ctx.DrawRect(item.OuterRect, new SKPaint() { Color = SKColors.Pink.WithAlpha(0x30) });
                
             }
 
@@ -298,8 +278,6 @@ namespace Photos.Lib
                 Invalidate();
                 onClick?.Invoke();
             }
-            //else if (e.Kind == libMouseEventKind.DragScroll)
-            //    e.Rejected = OuterRect.Contains(e.CurrentPoint);
         }
 
         bool _disposed;

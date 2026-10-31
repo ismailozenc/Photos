@@ -39,7 +39,6 @@ namespace Photos.Core
             FilterUpdate?.Invoke();
         }
 
-        public IReadOnlyDictionary<string, StoredFilterInfo> StoredFilters => DB.Settings.Filters;
         SettingsRecord ActiveSettings
         {
             get => PersistentFilters ? DB.Settings : volatileSettingsRecord;
@@ -108,13 +107,10 @@ namespace Photos.Core
         public void RefreshFilters(List<FileRecord> files, IEnumerable<DirectoryRecord> dirs, bool purgeMissing)
         {
             var sep = new[] { '\\', '/' };
-            //var files = GetLibraryFiles().ToList();
 
             int FindCommonPrefix(IEnumerable<string> strs)
             {
                 var ordered = strs.ToList();
-                //if (ordered.Count == 1)
-                //    return ordered[0].Length + 1;
                 ordered.Sort();
                 var first = ordered.First();
                 var last = ordered.Last();
@@ -298,7 +294,6 @@ namespace Photos.Core
         // menu ---------------
         public void ActiveFiltersMenu(MenuDef m, bool isForeignFilterSet = false, IReadOnlyDictionary<string, StoredFilterInfo> filterSet = null, bool withRecent = false)
         {
-            //var isForeignFilterSet = filterSet != null;
             var filters = GetActiveFilters(filterSet);
 
             m.Items.Add(new MenuItem()
@@ -358,17 +353,12 @@ namespace Photos.Core
             var activeFilters = fg.Filters.Values.Where(x => IsFilterActive(fg, x)).ToArray();
             var activeCount = activeFilters.Length;
 
-            //m.Items.Add(new MenuItem()
             //{
             //    Text = activeCount == 0 ? "- no items selected -" : $"- clear {activeCount} / {fg.Filters.Count} items -",
             //    TextAlign = SkiaSharp.SKTextAlign.Center,
             //    OnClick = () =>
             //    {
-            //        if (activeCount == 0)
-            //            return;
-            //        ToggleFilters(fg, activeFilters);
             //    }
-            //});
 
             ActiveFiltersMenu(m, false, ActiveSettings.Filters.Where(x => x.Key == fg.GroupId).ToDictionary(x => x.Key, x => x.Value), withRecent: true);
 

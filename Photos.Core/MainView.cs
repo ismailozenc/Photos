@@ -40,13 +40,10 @@ namespace Photos.Core
             TextLabelSize.Func = () => 32 * Window.ScaleFactor;
             WorkStatusLabelHeight.Func = () => 28 * Window.ScaleFactor;
 
-            //var asm = GetType().Assembly;
-            //DefaultTypeface = SKTypeface.FromStream(asm.GetManifestResourceStream(asm.GetManifestResourceNames().First(x => x.EndsWith(".ttf"))));
 
             OnDispose += () => { photoProvider.Dispose(); Utils.Trace("Dispose"); };
 
             Padding.Const = 0;
-            //Link = Attach(() => SKRect.Create(Window.ClientSize());
 
 
             _photoView = new(photoProvider)
@@ -199,7 +196,6 @@ namespace Photos.Core
                 Link = ThumbnailView.Attach(() => ThumbnailView.Position.Select(x => SKRect.Create(0, x.Height - WorkStatusLabelHeight * 1.3f, x.Width, WorkStatusLabelHeight))),
                 Padding = { Const = 1 },
                 TextAlign = { Const = SKTextAlign.Center },
-                //Enabled = { Func = () => photoProvider.WorkStatus != null && ThumbnailView.Enabled}
             };
             statusToast.Enabled.Adjust(x => x && photoProvider.Indexer.WorkStatus != null);
             photoProvider.Indexer.OnIndexing += indexing => Window?.Run(() => statusToast.Show(indexing ? float.PositiveInfinity : 5f));
@@ -276,7 +272,6 @@ namespace Photos.Core
             if (photoProvider.IsSingleFolderMode)
                 SwitchView(); // showselected pic
 
-            //MessageBox.Show(new[] { "test", "test test test test test test test test test test test test test test test test test ", "test" }, new () { Text = "test" }, new () { Text = "test testtest" });
             Window.RenderFinished += x => x.PrintUtcMs("render", 50, true);
 
             if (Window.TotalMemoryHintKB == 0)
@@ -349,12 +344,9 @@ namespace Photos.Core
 
         private void GoBack()
         {
-            //if (_mbox.Enabled)
             //{ 
             //    // TODO: cancel?
             //}
-            //else if (mainMenu.Enabled)
-            //    mainMenu.StepBack();
             //else 
             if (ThumbnailView.Enabled)
                 Window.Close();

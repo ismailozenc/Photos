@@ -254,33 +254,6 @@ namespace Photos.Core
 
         public IEnumerable<ExifTags> GetKeys() => _ifd0Catalogue?.Keys.Select(x => (ExifTags)x);
 
-        public string Dump
-        {
-            get
-            {
-                var keys = GetKeys();
-                if (keys == null)
-                    return "";
-                var sb = new StringBuilder();
-                sb.AppendLine("--");
-                foreach (var item in keys)
-                {
-                    var val = GetTagValue(item);
-                    sb.Append(item.ToString());
-                    sb.Append(": ");
-                    foreach (var v in val)
-                    {
-                        sb.Append(v is byte[] b ? "bytes:" + b.Length : v.ToString());
-                        sb.Append("; ");
-                    }
-                    sb.Append(val.FirstOrDefault()?.GetType());
-                    sb.AppendLine();
-                }
-                sb.AppendLine();
-                return sb.ToString();
-            }
-        }
-
         public object[] GetTagValue(ExifTags tagId) => GetTagValue((ushort)tagId);
 
         public object[] GetTagValue(ushort tagId)

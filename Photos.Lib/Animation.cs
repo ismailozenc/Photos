@@ -69,8 +69,6 @@ namespace Photos.Lib
 
         internal override void Run()
         {
-            //Debug.WriteLine($"x {X}, v {V}");
-            //var realDt = TimeDeltaSec; // does not work with real time (different speed)
             var dt = 0.02f;
 
             var a = (-Stiffness) * X / Mass;

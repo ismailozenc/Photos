@@ -34,23 +34,17 @@ namespace Photos.Core
                     // GetScaledDimensions does not work in 2.88.6
                     // https://github.com/mono/SkiaSharp/issues/2645
 
-                    //if (preScale.Height < shortSideSize || preScale.Width < shortSideSize)
-                    //    if (preScale != info.Size)
                     //    {
-                    //        preScale = info.Size;
-                    //        Trace($"bad scale: {preScale} {info.Size}");
                     //    }
                     imgData.Bitmap = new SKBitmap(preScale.Width, preScale.Height, sKCodec.Info.ColorType, sKCodec.Info.AlphaType);
                     var codecRes = sKCodec.GetPixels(imgData.Bitmap.Info, imgData.Bitmap.GetPixels(out var length));
                     if (codecRes != SKCodecResult.Success && codecRes != SKCodecResult.IncompleteInput)
                     {
-                        //Utils.Trace($"no pixels");
                         imgData.Bitmap.Dispose();
                         imgData.Bitmap = null;
                     }
                 }
                 //else
-                //    Utils.Trace($"failed");
 
 
                 if (imgData.Bitmap == null)
@@ -137,7 +131,6 @@ namespace Photos.Core
             }
 
             using var surface = new SKCanvas(rotated);
-            //surface.DrawRect(SKRect.Create(2, 2, rotated.Width - 4, rotated.Height - 4), new SKPaint() { Color = SKColors.Red, StrokeWidth = 4 });
             surface.SetMatrix(m);
             surface.DrawBitmap(bmp, 0, 0);
             surface.Flush();
@@ -150,11 +143,6 @@ namespace Photos.Core
 
         public static SKImage DecodeThumbnail(SKData data, SKEncodedOrigin orientation)
         {
-            //var img = SKImage.FromEncodedData(data);
-            //var res = img.ToRasterImage();
-            //if (res != img)
-            //    img.Dispose();
-            //return res;
 
             var bmp = SKBitmap.Decode(data);
             if (bmp == null)

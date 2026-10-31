@@ -395,9 +395,6 @@ namespace Photos.Core.StoredTypes
         /// <summary>Star rating, 0 (none) to 5.</summary>
         [Key("rt")]
         public int Rating;
-        /// <summary>User tags for this photo.</summary>
-        [Key("tg")]
-        public string[] Tags;
         [Key("ts")]
         public long TimeStamp;
     }

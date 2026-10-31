@@ -85,7 +85,6 @@ namespace Photos.Core
                     orig(ctx);
             };
 
-            //b.Background.Color = SKColors.Black;
             //b.CornerRadius = 
         }
 
@@ -123,21 +122,13 @@ namespace Photos.Core
                 Enabled = { Func = () => !IsEditMode }
             });
 
-            //new DragButton()
             //{
             //    Link = Attach(() => OuterRect),
             //    Enabled = { Func = () => _crop != null },
             //    GetPosition = () => _lastTransform.MapPoint(new SKPoint(_crop.Value.MidX * _lastRenderInfo.Width, _crop.Value.MidY * _lastRenderInfo.Height)),
             //    UpdatePosition = p =>
             //    {
-            //        var imgPoint = _lastInverse.MapPoint(p);
-            //        var pctCropStart = new SKPoint(imgPoint.X / _lastRenderInfo.Width, imgPoint.Y / _lastRenderInfo.Height) - _crop.Value.Size.ToPoint().Multiply(0.5f);
-            //        pctCropStart.X = Math.Clamp(pctCropStart.X, 0, 1 - _crop.Value.Width);
-            //        pctCropStart.Y = Math.Clamp(pctCropStart.Y, 0, 1 - _crop.Value.Height);
-            //        _crop = SKRect.Create(pctCropStart, _crop.Value.Size);
             //    },
-            //    DragMidPoint = new SKPoint(.5f, .5f)
-            //};
 
             var dragButtons = new List<DragButton>();
             IsCropDrag = () => dragButtons.Any(x => x.IsDragging);
@@ -285,14 +276,10 @@ namespace Photos.Core
             };
             StyleButton(ToolbarMenu.MenuButton);
 
-            //Dropdown = new DropdownMenu()
             //{
             //    Parent = this,
             //    Link = () => SKRect.Create(Size.Width - ButtonPanelButtonSize * 4, MainView.ButtonPadding, ButtonPanelButtonSize * 4, Size.Height - ButtonPanelButtonSize),
-            //    ButtonSize = { Func = () => ButtonPanelButtonSize }
-            //};
 
-            //Dropdown.Items.AddRange(items);
 
             photoProvider.OnBackgroundWorker += Preload;
         }
@@ -305,9 +292,7 @@ namespace Photos.Core
             if (save && _crop != null)
             {
                 var file = CurrentFile;
-                //var fname = file.Src.First().FN;
 
-                //var ext = Path.GetExtension(fname);
                 string picFolder = photoProvider.Indexer.EditorDirectory;
 
                 Directory.CreateDirectory(picFolder);
@@ -317,7 +302,6 @@ namespace Photos.Core
                 var imgName = $"edited_{DateTime.Now:yyyyMMdd_HHmmss}";
                 do
                 {
-                    //newPath = Path.Combine(picFolder, $"{fname[0..^ext.Length]}~{cntr}.jpg");
                     newPath = Path.Combine(picFolder, cntr == 0 ? $"{imgName}.jpg" : $"{imgName}~{cntr}.jpg");
                     cntr++;
                 } while (File.Exists(newPath));
@@ -348,7 +332,6 @@ namespace Photos.Core
 
                 MainToast.Show($"Saved"); //  to '{newPath}'
 
-                //photoProvider.SelectOnNextRefreshPath = newPath;
                 Task.Run(() =>
                 {
                     photoProvider.UpdateLibraryMaybe(new() { QuickScanOnly = true });
@@ -442,7 +425,6 @@ namespace Photos.Core
             // Adjust target aspect ratio based on image dimensions
             var targetAspect = _aspectRatioConstraint.Value * (imgHeight / imgWidth);
 
-            //Console.WriteLine($"_crop: {_crop.Value}, currentAspect: {currentAspect}, targetAspect: {targetAspect}");
 
             if (Math.Abs(currentAspect - targetAspect) > 0.01f)
             {
@@ -726,14 +708,9 @@ namespace Photos.Core
                 else if (e.Kind == libMouseEventKind.Up)
                 {
                     _isDragging = false;
-                    //if (_userTransform.ScaleX == 1)
                     //{
-                    //    var speed = e.DragV.X;
                     //    //Debug.WriteLine(speed);
-                    //    if (Math.Abs(speed) > 200)
                     //    {
-                    //        stepDirection = -Math.Sign(speed);
-                    //        SwitchImage(true);
                     //    }
                     //}
                     Invalidate();
@@ -783,9 +760,7 @@ namespace Photos.Core
         {
             animation.V = v;
             animation.X = _userTransform.TransX - XTarget;
-            //Debug.WriteLine($" -------------{animation.X}-------------- ");
 
-            //Task.Delay(100).ContinueWith(x=> animation.Start());
             animation.Start();
         }
         float XTarget => (OuterRect.Width - _initRect.Width) / 2;
@@ -793,7 +768,6 @@ namespace Photos.Core
         void Animate()
         {
             _userTransform.TransX = animation.X + XTarget;
-            //Debug.WriteLine($"{DateTime.UtcNow.TimeOfDay.TotalSeconds}>{_userTransform.TransX}");
         }
 
         const float ImgMargin = 50;
@@ -849,8 +823,6 @@ namespace Photos.Core
             SKImage bitmap;
             if (_userTransform.ScaleX > 1 && file == _zoomImgFile && _zoomImage?.Image != null && (!_zoomImage.IsNew || (!_isDragging && animation.Stopped && (DateTime.UtcNow - _lastScaleUtc).TotalMilliseconds > 300)))
             {
-                //if (_zoomImgNew)
-                //    Window.GR?.PurgeResources();
                 bitmap = _zoomImage.Image;
                 _zoomImage.IsNew = false;
             }
@@ -891,10 +863,7 @@ namespace Photos.Core
                     _lastFile = file;
                     _lastMaxBounds = maxBounds;
                     _lastBounds = bounds.Size;
-                    //Debug.WriteLine(transitionOffset);
                     _userTransform.TransX += transitionOffset;
-                    //if (transitionOffset != 0 && restartAnimation)
-                    //    StartAnimation(0);
                     transitionOffset = 0;
                     InfoToast.Show(file.Src[0].FN, 5);
                 }
@@ -938,7 +907,6 @@ namespace Photos.Core
                 ctx.DrawRect(fullCropTarget.Crop(SKRect.Create(0, 1f / 3, 1, 1f / 3)), cropBorderPaint);
                 ctx.DrawRect(fullCropTarget.Crop(SKRect.Create(1f / 3, 0, 1f / 3, 1)), cropBorderPaint);
 
-                //_cropButtonCenter.Layout(SKRect.Create(fullCropTarget.MidX - ButtonPanelButtonSize / 2, fullCropTarget.MidY - ButtonPanelButtonSize / 2, ButtonPanelButtonSize, ButtonPanelButtonSize));
             }
 
             dt.PrintUtcMs($"DrawImage {file.Sig}", 30);

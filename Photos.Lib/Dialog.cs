@@ -9,7 +9,6 @@ namespace Photos.Lib
 {
     public class Dialog : FreePanel
     {
-        //public Func<SKSize> ContentSize;
         public readonly Val<float> ButtonSize = new(-1);
 
         protected FreePanel DialogContainer;
@@ -21,7 +20,6 @@ namespace Photos.Lib
         {
             Enabled.Const = false;
             DialogContainer = new FreePanel() { Link = Attach(() => DialogRect()), Padding = { Func = () => Padding } };
-            //Rect = () => Parent.OuterRect;
 
             MouseHandler = e =>
             {

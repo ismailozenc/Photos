@@ -8,7 +8,6 @@ namespace Photos.Lib
 {
     public class Val<T> //where T : IEquatable<T>
     {
-        //private T _lastFuncVal;
         private T _const;
         public Func<T> Func;
         public event Action<T,T> OnConstSet;
@@ -20,10 +19,7 @@ namespace Photos.Lib
                 if (Func == null)
                     return _const;
                 var val = Func();
-                //var old = _lastFuncVal;
-                //_lastFuncVal = val;
 
-                //if (val == null && old != null || val != null && !val.Equals(old))
                 //    OnChange?.Invoke(old, val);
 
                 return val;

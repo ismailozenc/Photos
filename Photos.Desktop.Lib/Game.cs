@@ -268,7 +268,6 @@ namespace Photos.Desktop
                 CurrentPoint = lastPoint,
             };
 
-            //moveAccepted = false;
 
             _window.RouteMouseEvent(downEvent);
         }
@@ -358,7 +357,6 @@ namespace Photos.Desktop
             if (skSurface == null)
                 throw new Exception("SKIA surface error");
 
-            //skiaCtx.SetResourceCacheLimit(1024 * 1024);
 
             IsViewValid = false;
         }

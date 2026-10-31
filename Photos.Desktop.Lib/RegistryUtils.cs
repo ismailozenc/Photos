@@ -69,7 +69,6 @@ namespace Photos.Desktop
                     skExtOrig.SetValue(extKey, "");
 
                     skSupportedTypes.SetValue(item, "");
-                    //Registry.CurrentUser.DeleteSubKeyTree($@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{item}\UserChoice", false);
                 }
 
                 SHChangeNotify(HChangeNotifyEventID.SHCNE_ASSOCCHANGED, HChangeNotifyFlags.SHCNF_IDLIST, (IntPtr)0, (IntPtr)0);

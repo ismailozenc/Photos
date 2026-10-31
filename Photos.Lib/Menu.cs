@@ -54,7 +54,6 @@ namespace Photos.Lib
         TextLabel SectionLabel;
         public readonly Button MenuButton;
 
-        //public float TextScale = 1f;
         public Val<int> ItemMargin => _replicator.ItemMargin;
         public Val<float> RightPadding = new (0);
         Replicator _replicator;
@@ -134,7 +133,6 @@ namespace Photos.Lib
             //    DrawBorder = false,
             //    Enabled = { Func = () => ActiveMenu.Items?.All(x => x.Selected != null) == true },
             //    Padding = { Const = 3 },
-            //};
 
             TitleLabel = new TextLabel()
             {
@@ -162,7 +160,6 @@ namespace Photos.Lib
                 Icon = { Func = () => CurItem.Icon },
             };
 
-            //MenuButton.TextSizeRatio.Adjust(x => ActiveMenu.LargeButtons ? x - 0.08f : x);
             MenuButton.TextLabel.TextScale.Adjust(GetTextScale);
 
             PreTextLabel = new TextLabel()

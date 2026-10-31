@@ -25,9 +25,6 @@ namespace Photos.Lib
         public float ScaleFactor = 1;
         public bool ManualClickDetection;
         public bool FixedScaleFactor;
-        public string DeviceName = Environment.MachineName;
-        public string StoragePrefix;
-
         DateTime[] _renderHist = new DateTime[300];
 
         internal readonly List<Animation> _animations = new();
@@ -70,17 +67,11 @@ namespace Photos.Lib
             //bool lockWasTaken = false;
             //try
             //{
-            //    Monitor.TryEnter(_lock, 50, ref lockWasTaken);
-            //    if (lockWasTaken)
             //    {
-            //        ctx.Clear(SKColors.Black.WithAlpha(0x90));
-            //        RootView.RouteRenderFrame(ctx);
             //    }
             //}
             //finally
             //{
-            //    if (lockWasTaken) 
-            //        Monitor.Exit(_lock);
             //}
 
             lock (_lock)
@@ -156,7 +147,6 @@ namespace Photos.Lib
 
             return _lastMemValue;
         }
-        public bool Initialized => _initialized;
         public void Initialize(BaseView rootView)
         {
             if (_initialized)

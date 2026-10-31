@@ -20,7 +20,6 @@ namespace Photos.Lib
         public Func<int,SKRect> GetChildRect;
         public readonly Val<SKSize> TileSize = new Val<SKSize>(SKSize.Empty);
 
-        //public Func<Task> Preload;
 
         public int GetItemsPerRow(float width) => Math.Max(1, (int)((width + ItemMargin) / (TileSize.Value.Width + ItemMargin)));
 
@@ -79,7 +78,6 @@ namespace Photos.Lib
 
         void LoopItems(Func<bool> action, float min, float max)
         {
-            //var c = cntr;
             if (Children.Count != 1)
                 throw new Exception("exacly one child expected");
             var count = ItemsCount.Value;
@@ -95,7 +93,6 @@ namespace Photos.Lib
             }
             CurrentIndex = -1;
 
-            //Debug.WriteLine($"{cntr - c} for {count}");
         }
 
         public static (int low, int high) BinarySearch(int low, int count, int treshold, Func<int, bool> pred)
