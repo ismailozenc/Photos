@@ -350,6 +350,10 @@ namespace Photos.Core.StoredTypes
         [Key("notif")]
         public bool UpdatesNotificationOptOut;
 
+        /// <summary>Ranking of the library by head-to-head choices (see RankingEngine).</summary>
+        [Key("rk")]
+        public RankingState Ranking;
+
         [IgnoreMember]
         Type EqualityContract => null;
     }
@@ -384,6 +388,12 @@ namespace Photos.Core.StoredTypes
         public int Orientation;
         [Key("if")]
         public bool IsFavorite;
+        /// <summary>Star rating, 0 (none) to 5.</summary>
+        [Key("rt")]
+        public int Rating;
+        /// <summary>User tags for this photo.</summary>
+        [Key("tg")]
+        public string[] Tags;
         [Key("ts")]
         public long TimeStamp;
     }

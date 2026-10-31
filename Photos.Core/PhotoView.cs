@@ -40,6 +40,7 @@ namespace Photos.Core
         Menu ToolbarMenu;
 
         public event Action OnBackPressed;
+        public event Action OnCompareRequested;
 
         public readonly List<MenuItem> MenuItems;
 
@@ -226,6 +227,11 @@ namespace Photos.Core
                     Icon = IconStore.Trash3,
                     Text = "Delete",
                     OnClick = Trash,
+                },
+                new MenuItem()
+                {
+                    Text = "Compare photos (C)",
+                    OnClick = () => OnCompareRequested?.Invoke(),
                 },
             };
 
@@ -459,6 +465,42 @@ namespace Photos.Core
             _crop = currentCrop;
         }
 
+        /// <summary>Sets the star rating (0 clears it) for the current photo.</summary>
+        private void SetRating(int rating)
+        {
+            var f = CurrentFile;
+            if (f == null || !f.IsIndexed())
+                return;
+
+            var dat = photoProvider.DB.GetAdditionalImageData(f);
+            dat.Rating = rating;
+            photoProvider.DB.SetAdditionalImageData(f, dat);
+            InfoToast.Show(rating == 0 ? "Rating cleared" : $"Rating {new string('★', rating)}", 2);
+        }
+
+        bool _slideshow;
+        readonly Stopwatch _slideshowTimer = new();
+        const int SlideshowIntervalMs = 5000;
+
+        private void ToggleSlideshow()
+        {
+            _slideshow = !_slideshow;
+            _slideshowTimer.Restart();
+            InfoToast.Show(_slideshow ? "Slideshow on (S to stop)" : "Slideshow off", 2);
+        }
+
+        /// <summary>Advances to the next photo every <see cref="SlideshowIntervalMs"/> while the slideshow is on.</summary>
+        private void TickSlideshow()
+        {
+            if (!_slideshow || !Enabled)
+                return;
+            if (_slideshowTimer.ElapsedMilliseconds < SlideshowIntervalMs)
+                return;
+
+            _slideshowTimer.Restart();
+            SwitchImage(1, false);
+        }
+
         private void ToggleFavorite()
         {
             var f = CurrentFile;
@@ -568,6 +610,25 @@ namespace Photos.Core
             var time = DateTime.UtcNow;
             if ((time - _lastKey).TotalMilliseconds < 30)
                 return; // prevent jumping
+
+            if (e.Key >= libKeys.D0 && e.Key <= libKeys.D5)
+            {
+                SetRating((int)e.Key - (int)libKeys.D0);
+                e.Consume();
+                return;
+            }
+            if (e.Key == libKeys.S)
+            {
+                ToggleSlideshow();
+                e.Consume();
+                return;
+            }
+            if (e.Key == libKeys.C)
+            {
+                OnCompareRequested?.Invoke();
+                e.Consume();
+                return;
+            }
 
             var dir = 0;
             if (e.Key == libKeys.Left)
@@ -739,6 +800,7 @@ namespace Photos.Core
 
         void RenderFrame(SKCanvas ctx)
         {
+            TickSlideshow();
             photoProvider.MinPreloadImage = photoProvider.Idx - winSize;
             photoProvider.MaxPreloadImage = photoProvider.Idx + winSize;
 

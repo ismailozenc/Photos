@@ -16,6 +16,7 @@ namespace Photos.Core
         public static string Copyright = "Copyright (c) 2022-2026 Vadim Lapiner";
 
         PhotoView _photoView;
+        CompareView _compareView;
         public readonly ThumbnailView ThumbnailView;
         Menu mainMenu;
         public readonly Toast MainToast;
@@ -56,7 +57,18 @@ namespace Photos.Core
                 ButtonPanelButtonSize = { Func = () => BigButtonSize }
             };
             _photoView.OnBackPressed += SwitchView;
-            _photoView.Enabled.Func = () => !ThumbnailView.Enabled;
+
+            _compareView = new(photoProvider)
+            {
+                Link = Attach(() => OuterRect),
+            };
+            _compareView.OnBackPressed += () => _compareView.Enabled.Const = false;
+            _photoView.OnCompareRequested += () =>
+            {
+                _compareView.Open();
+                _compareView.Enabled.Const = true;
+            };
+            _photoView.Enabled.Func = () => !ThumbnailView.Enabled && !_compareView.Enabled;
 
             ThumbnailView = new(photoProvider, ButtonSize)
             {
@@ -369,6 +381,8 @@ namespace Photos.Core
             //else 
             if (ThumbnailView.Enabled)
                 Window.Close();
+            else if (_compareView.Enabled)
+                _compareView.Close();
             else if (_photoView.Enabled)
                 _photoView.GoBack();
         }
