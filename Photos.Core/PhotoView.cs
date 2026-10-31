@@ -261,6 +261,14 @@ namespace Photos.Core
                 Enabled = { Func = () => !IsEditMode && CurrentFile.IsIndexed() }
             });
 
+            StyleButton(new Button()
+            {
+                Icon = { Func = () => IconStore.Play },
+                OnClick = ToggleSlideshow,
+                Link = Attach(() => MenuButton.Position.Select(x => x.OffsetRect(x: -2 * ButtonPanelButtonSize - 2 * MainView.ButtonPadding))),
+                Enabled = { Func = () => !IsEditMode && photoProvider.DispalyGroups.Count > 0 }
+            });
+
             ToolbarMenu = new Menu()
             {
                 Link = Attach(() => OuterRect),
@@ -498,6 +506,7 @@ namespace Photos.Core
                 return;
 
             _slideshowTimer.Restart();
+            Utils.Trace("Slideshow: next photo");
             SwitchImage(1, false);
         }
 
