@@ -122,9 +122,7 @@ namespace Photos.Desktop
                     continue;
 
                 var row = _rows[i];
-                bool selectedFolder = _provider.TrashFolderIds.Contains(row.Id)
-                    ? _provider.ShowDeleted
-                    : _group != null && _provider.FilterService.IsFilterActive(_group, row);
+                bool selectedFolder = IsSelectedFolder(row);
                 if (selectedFolder)
                     canvas.DrawRect(SKRect.Create(0, top, width, RowHeight), folderPaint);
                 if (i == _cursor)
@@ -237,6 +235,11 @@ namespace Photos.Desktop
             return result;
         }
 
+        /// <summary>True when the folder is highlighted: its filter is on, or it is the deleted-images folder while that view is open.</summary>
+        bool IsSelectedFolder(FileFilter row) => _provider.TrashFolderIds.Contains(row.Id)
+            ? _provider.ShowDeleted
+            : _group != null && _provider.FilterService.IsFilterActive(_group, row);
+
         bool IsPrivateRow(string id) => PrivateFolderRules.IsPrivate(_provider.PrivateFolderIds, id);
 
         float MaxScroll(int clientHeight) => Math.Max(0, _rows.Count * RowHeight - (clientHeight - HeaderHeight));
@@ -295,27 +298,40 @@ namespace Photos.Desktop
             _menuOpen = true;
         }
 
-        List<(string Text, Action Run)> BuildMenu(FileFilter row)
+        /// <summary>
+        /// Menu for a right-click. If the clicked folder is highlighted, every highlighted folder is acted on;
+        /// otherwise only the clicked folder is.
+        /// </summary>
+        List<(string Text, Action Run)> BuildMenu(FileFilter clicked)
         {
             var items = new List<(string Text, Action Run)>();
-            string id = row.Id;
-            bool isPrivate = IsPrivateRow(id);
-            bool isMarked = _provider.PrivateFolderIds.Contains(id, StringComparer.OrdinalIgnoreCase);
-
             void Add(string text, Action run) => items.Add((text, run));
 
-            if (isPrivate && !_provider.PrivateUnlocked)
+            var highlighted = _rows.Where(IsSelectedFolder).ToList();
+            var targets = highlighted.Contains(clicked) ? highlighted : new List<FileFilter> { clicked };
+            var ids = targets.Select(t => t.Id).ToList();
+            bool several = ids.Count > 1;
+
+            var privateIds = ids.Where(IsPrivateRow).ToList();
+            var toMark = ids.Where(id => !IsPrivateRow(id)).ToList();
+            var directMarked = ids.Where(id => _provider.PrivateFolderIds.Contains(id, StringComparer.OrdinalIgnoreCase)).ToList();
+
+            if (privateIds.Count > 0 && !_provider.PrivateUnlocked)
                 Add("Unlock private folders...", UnlockFromWindow);
-            else if (!isPrivate)
-                Add("Mark as private (recursive)", () => _provider.SetFolderPrivate(id, true));
-            else if (isMarked)
-                Add("Unmark private (recursive)", () => _provider.SetFolderPrivate(id, false));
-            else
+            if (toMark.Count > 0)
+                Add(several ? $"Mark {toMark.Count} folders as private (recursive)" : "Mark as private (recursive)",
+                    () => _provider.SetFoldersPrivate(toMark, true));
+            if (directMarked.Count > 0 && _provider.PrivateUnlocked)
+                Add(several ? $"Unmark {directMarked.Count} folders as private" : "Unmark private (recursive)",
+                    () => _provider.SetFoldersPrivate(directMarked, false));
+            if (!several && privateIds.Count == 1 && directMarked.Count == 0 && _provider.PrivateUnlocked)
                 Add("Private through a parent folder", null);
 
-            bool hidden = _provider.IsExcludedFolder(id);
-            Add(hidden ? "Show in browse and slideshows" : "Hide from browse and slideshows (this folder only)",
-                () => _provider.SetFolderExcluded(id, !hidden));
+            bool allHidden = ids.All(_provider.IsExcludedFolder);
+            string hideText = allHidden
+                ? (several ? $"Show {ids.Count} folders in browse and slideshows" : "Show in browse and slideshows")
+                : (several ? $"Hide {ids.Count} folders from browse and slideshows" : "Hide from browse and slideshows (this folder only)");
+            Add(hideText, () => _provider.SetFoldersExcluded(ids, !allHidden));
 
             return items;
         }

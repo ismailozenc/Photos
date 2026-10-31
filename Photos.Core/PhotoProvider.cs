@@ -408,12 +408,14 @@ namespace Photos.Core
         /// <summary>A photo is hidden only when every copy is in a hidden folder.</summary>
         public bool IsFullyExcluded(FileRecord file) => file.Src.All(IsExcludedSource);
 
-        public void SetFolderExcluded(string folderId, bool excluded)
+        /// <summary>Hides or shows several folders in browse and slideshows, with one settings save and one refresh.</summary>
+        public void SetFoldersExcluded(IEnumerable<string> folderIds, bool excluded)
         {
+            var changed = folderIds.ToList();
             var ids = (DB.Settings.ExcludedFolders ?? Array.Empty<string>())
-                .Where(x => !string.Equals(x, folderId, StringComparison.OrdinalIgnoreCase)).ToList();
+                .Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
             if (excluded)
-                ids.Add(folderId);
+                ids.AddRange(changed);
             DB.Settings = DB.Settings with { ExcludedFolders = ids.ToArray() };
             EnqueueRefreshDisplayOrder();
         }
@@ -591,11 +593,13 @@ namespace Photos.Core
             EnqueueRefreshDisplayOrder();
         }
 
-        public void SetFolderPrivate(string folderId, bool isPrivate)
+        /// <summary>Marks or unmarks several folders as private, with one settings save and one refresh.</summary>
+        public void SetFoldersPrivate(IEnumerable<string> folderIds, bool isPrivate)
         {
-            var ids = PrivateFolderIds.Where(x => !string.Equals(x, folderId, StringComparison.OrdinalIgnoreCase)).ToList();
+            var changed = folderIds.ToList();
+            var ids = PrivateFolderIds.Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
             if (isPrivate)
-                ids.Add(folderId);
+                ids.AddRange(changed);
             DB.Settings = DB.Settings with { PrivateFolders = ids.ToArray() };
             EnqueueRefreshDisplayOrder();
         }
