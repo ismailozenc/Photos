@@ -70,6 +70,17 @@ namespace Photos.Core
             DB = db;
             ProtectUnreadableFolders = protectUnreadableFolders;
             EditorDirectory = editorDirectory;
+
+            // The editor output folder is a built-in library folder. Create it up front so the
+            // first index pass does not fail on a machine where it has never been used.
+            try
+            {
+                Directory.CreateDirectory(EditorDirectory);
+            }
+            catch (Exception ex)
+            {
+                Utils.Trace($"Could not create editor folder {EditorDirectory}: {ex.Message}");
+            }
         }
 
         internal void ListDir(Func<bool> isCanceled, IndexUpdateInfo indexInfo, string dir, bool recurse, bool checkAdditionalInfo = false)
