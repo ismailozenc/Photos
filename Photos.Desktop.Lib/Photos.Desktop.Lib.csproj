@@ -37,4 +37,9 @@
     <ProjectReference Include="..\Photos.Lib\Photos.Lib.csproj" />
   </ItemGroup>
 
+  <!-- WinForms is used only in WinFormsDialogs.cs; its implicit usings clash with Photos.Lib (Button, Menu). -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
 </Project>

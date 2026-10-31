@@ -4,7 +4,7 @@ using System.Runtime.Versioning;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace Photos.Desktop.Lib
+namespace Photos.Desktop
 {
     /// <summary>
     /// Shows message dialogs as standard WinForms windows on Windows. The drawn dialog is kept
