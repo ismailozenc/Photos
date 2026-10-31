@@ -339,9 +339,11 @@ namespace Photos.Core
                 var files = GetLibraryFiles(out var dirs);
                 TotalCount = files.Count;
 
+                FilterService.IsHidden = IsHiddenFile;
                 if (!skipFilters)
                     FilterService.RefreshFilters(files, dirs.Where(x => x != null), initTask != null);
 
+                files = files.Where(f => !IsHiddenFile(f)).ToList(); // private folders stay out until unlocked
                 FilterService.FilterFiles(files);
 
                 if (FilterService.CurrentSortMode == SortModeEnum.Filename)
@@ -415,6 +417,52 @@ namespace Photos.Core
                 postUpdate();
                 return null;
             }
+        }
+
+        /// <summary>True after the password was entered in this session. Private folders stay hidden until then.</summary>
+        public bool PrivateUnlocked { get; private set; }
+
+        /// <summary>Folder ids marked private. They are listed in the folder view.</summary>
+        public IReadOnlyList<string> PrivateFolderIds => DB.Settings.PrivateFolders ?? Array.Empty<string>();
+
+        public bool HasPrivateFolders => PrivateFolderIds.Count > 0;
+
+        /// <summary>True when a file must not be shown: it lies in a private folder and the session is locked.</summary>
+        public bool IsHiddenFile(FileRecord file)
+        {
+            if (PrivateUnlocked || !HasPrivateFolders)
+                return false;
+            return file.Src.Any(s =>
+            {
+                var dir = DB.Directories.GetValue(s.D);
+                return dir != null && PrivateFolderRules.IsPrivate(PrivateFolderIds, $"{dir.SourceId}/{dir.Directory.ToLowerInvariant()}");
+            });
+        }
+
+        public bool TryUnlockPrivate(string password)
+        {
+            if (password != PrivateFolderRules.Password)
+                return false;
+            PrivateUnlocked = true;
+            EnqueueRefreshDisplayOrder();
+            return true;
+        }
+
+        public void LockPrivate()
+        {
+            if (!PrivateUnlocked)
+                return;
+            PrivateUnlocked = false;
+            EnqueueRefreshDisplayOrder();
+        }
+
+        public void SetFolderPrivate(string folderId, bool isPrivate)
+        {
+            var ids = PrivateFolderIds.Where(x => !string.Equals(x, folderId, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (isPrivate)
+                ids.Add(folderId);
+            DB.Settings = DB.Settings with { PrivateFolders = ids.ToArray() };
+            EnqueueRefreshDisplayOrder();
         }
 
         public List<FileRecord> GetLibraryFiles(out DirectoryRecord[] dirs, bool realLibOnly = false)

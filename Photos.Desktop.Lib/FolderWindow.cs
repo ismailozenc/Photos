@@ -1,21 +1,23 @@
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using Photos.Core;
+using Photos.Lib;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Photos.Desktop
 {
     /// <summary>
-    /// Folder list on the portrait display. It lists every library folder, including subfolders,
-    /// with its photo count. Clicking a folder, or pressing Enter on it, toggles the same folder
-    /// filter the main window uses. Up and Down move the cursor, and the mouse wheel scrolls.
+    /// Folder list on the portrait display. Each row shows the folder's shown count and its total of
+    /// known images on disk. Images that are not shown (not displayable, or private while locked) are
+    /// listed in colour. Clicking a folder, or pressing Enter, toggles the main window's folder filter.
+    /// Right-click marks a folder private (recursively), unlocks private folders, or unmarks them.
     /// </summary>
     internal sealed class FolderWindow : SkiaWindow
     {
@@ -23,6 +25,7 @@ namespace Photos.Desktop
         const float RowHeight = 34;
         const float Padding = 14;
         const float IndentStep = 16;
+        const float MenuWidth = 280;
         const int RefreshMs = 250;
 
         readonly PhotoProvider _provider;
@@ -30,9 +33,13 @@ namespace Photos.Desktop
         FileFilterGroup _group;
         List<FileFilter> _rows = new List<FileFilter>();
         int _cursor;
+        float _scroll;
         readonly Dictionary<string, int> _totals = new Dictionary<string, int>(); // -1 = unknown
         Task<Dictionary<string, int>> _countTask;
-        float _scroll;
+
+        bool _menuOpen;
+        float _menuX, _menuY;
+        List<(string Text, Action Run)> _menuItems = new List<(string Text, Action Run)>();
 
         public FolderWindow(PhotoProvider provider, Rectangle bounds)
             : base(bounds.X, bounds.Y, bounds.Width, bounds.Height, Core.Utils.LatinAppName)
@@ -61,6 +68,8 @@ namespace Photos.Desktop
                 _countTask = null;
             }
 
+            UpdateRootTotals();
+
             if (_countTask == null)
             {
                 var pending = new List<(string Id, string Dir)>();
@@ -86,7 +95,9 @@ namespace Photos.Desktop
             using var titlePaint = new SKPaint { Color = SKColors.White, IsAntialias = true };
             using var textPaint = new SKPaint { Color = SKColors.White.WithAlpha(220), IsAntialias = true };
             using var activePaint = new SKPaint { Color = SKColors.LightGreen, IsAntialias = true };
+            using var privatePaint = new SKPaint { Color = SKColors.Orange, IsAntialias = true };
             using var countPaint = new SKPaint { Color = SKColors.Gray, IsAntialias = true };
+            using var hiddenPaint = new SKPaint { Color = SKColors.Orange, IsAntialias = true };
             using var selectionPaint = new SKPaint { Color = SKColor.Parse("#33FFFFFF") };
             using var font = new SKFont(SKTypeface.Default, 18);
             using var titleFont = new SKFont(SKTypeface.Default, 20);
@@ -116,16 +127,48 @@ namespace Photos.Desktop
                 int depth = rel.Count(c => c == '\\' || c == '/');
                 string name = rel.Length == 0 ? "<root>" : rel.Split('\\', '/').Last();
 
+                bool isPrivate = IsPrivateRow(row.Id);
                 bool active = _group != null && _provider.FilterService.IsFilterActive(_group, row);
                 float baseline = top + RowHeight * 0.7f;
-                canvas.DrawText(name, Padding + depth * IndentStep, baseline, font, active ? activePaint : textPaint);
-                string countText = _totals.TryGetValue(row.Id, out int total) && total >= row.Count
-                    ? $"{row.Count}/{total}"   // shown / all known images on disk
-                    : row.Count.ToString();
-                canvas.DrawText(countText, width - Padding, baseline, SKTextAlign.Right, font, countPaint);
+                var namePaint = isPrivate ? privatePaint : active ? activePaint : textPaint;
+                canvas.DrawText(name, Padding + depth * IndentStep, baseline, font, namePaint);
+
+                // shown / total known images; the part that is not shown is drawn in colour
+                int shown = row.Count;
+                bool hasTotal = _totals.TryGetValue(row.Id, out int total) && total >= shown;
+                string shownText = hasTotal ? $"{shown}/{total}" : shown.ToString();
+                float right = width - Padding;
+                canvas.DrawText(shownText, right, baseline, SKTextAlign.Right, font, countPaint);
+                if (hasTotal && total > shown)
+                {
+                    float shownWidth = font.MeasureText(shownText);
+                    canvas.DrawText($"{total - shown} not shown   ", right - shownWidth, baseline, SKTextAlign.Right, font, hiddenPaint);
+                }
             }
 
             canvas.Restore();
+
+            if (_menuOpen)
+                DrawMenu(canvas, font);
+        }
+
+        void DrawMenu(SKCanvas canvas, SKFont font)
+        {
+            float height = _menuItems.Count * RowHeight + 8;
+            var rect = SKRect.Create(_menuX, _menuY, MenuWidth, height);
+
+            using var back = new SKPaint { Color = SKColor.Parse("#F0202020") };
+            using var border = new SKPaint { Color = SKColors.Gray, Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+            using var text = new SKPaint { Color = SKColors.White, IsAntialias = true };
+            using var disabled = new SKPaint { Color = SKColors.Gray, IsAntialias = true };
+
+            canvas.DrawRect(rect, back);
+            canvas.DrawRect(rect, border);
+            for (int i = 0; i < _menuItems.Count; i++)
+            {
+                float baseline = _menuY + 4 + i * RowHeight + RowHeight * 0.7f;
+                canvas.DrawText(_menuItems[i].Text, _menuX + 12, baseline, font, _menuItems[i].Run == null ? disabled : text);
+            }
         }
 
         /// <summary>Folder path for a local folder row, or null for other sources and the source root.</summary>
@@ -136,6 +179,31 @@ namespace Photos.Desktop
                 return null;
             var path = id[(slash + 1)..];
             return string.IsNullOrWhiteSpace(path) ? null : path;
+        }
+
+        static bool IsRootRow(string id) => id.EndsWith('/');
+
+        static int SourceOf(string id)
+        {
+            int slash = id.IndexOf('/');
+            return slash > 0 && int.TryParse(id.AsSpan(0, slash), out int source) ? source : -1;
+        }
+
+        static bool IsTopLevel(string text)
+        {
+            var rel = text.Trim().Trim('\\', '/');
+            return rel.Length > 0 && rel.IndexOfAny(new[] { '\\', '/' }) < 0;
+        }
+
+        /// <summary>A local source's root row covers every folder under it, so its total is the sum of its top-level folders.</summary>
+        void UpdateRootTotals()
+        {
+            foreach (var root in _rows.Where(r => IsRootRow(r.Id) && SourceOf(r.Id) == 0))
+            {
+                var tops = _rows.Where(r => !IsRootRow(r.Id) && SourceOf(r.Id) == 0 && IsTopLevel(r.Text))
+                    .Select(r => _totals.TryGetValue(r.Id, out int t) ? t : -1).ToList();
+                _totals[root.Id] = tops.Count > 0 && tops.All(t => t >= 0) ? tops.Sum() : -1;
+            }
         }
 
         /// <summary>Counts every file with a known image extension in each folder, including subfolders.</summary>
@@ -159,6 +227,8 @@ namespace Photos.Desktop
             return result;
         }
 
+        bool IsPrivateRow(string id) => PrivateFolderRules.IsPrivate(_provider.PrivateFolderIds, id);
+
         float MaxScroll(int clientHeight) => Math.Max(0, _rows.Count * RowHeight - (clientHeight - HeaderHeight));
 
         void EnsureCursorVisible()
@@ -179,12 +249,76 @@ namespace Photos.Desktop
             _provider.FilterService.ToggleFilters(_group, _rows[index]);
         }
 
+        int RowAt(float y)
+        {
+            if (y < HeaderHeight)
+                return -1;
+            int index = (int)((y - HeaderHeight + _scroll) / RowHeight);
+            return index >= 0 && index < _rows.Count ? index : -1;
+        }
+
+        int MenuItemAt(float x, float y)
+        {
+            float height = _menuItems.Count * RowHeight + 8;
+            if (x < _menuX || x > _menuX + MenuWidth || y < _menuY + 4 || y > _menuY + height - 4)
+                return -1;
+            int index = (int)((y - _menuY - 4) / RowHeight);
+            return index >= 0 && index < _menuItems.Count ? index : -1;
+        }
+
+        void OpenMenu(float x, float y)
+        {
+            int index = RowAt(y);
+            if (index < 0)
+                return;
+
+            _cursor = index;
+            _menuItems = BuildMenu(_rows[index]);
+            float height = _menuItems.Count * RowHeight + 8;
+            _menuX = Math.Max(0, Math.Min(x, ClientSize.X - MenuWidth));
+            _menuY = Math.Max(0, Math.Min(y, ClientSize.Y - height));
+            _menuOpen = true;
+        }
+
+        List<(string Text, Action Run)> BuildMenu(FileFilter row)
+        {
+            var items = new List<(string Text, Action Run)>();
+            string id = row.Id;
+            bool isPrivate = IsPrivateRow(id);
+            bool isMarked = _provider.PrivateFolderIds.Contains(id, StringComparer.OrdinalIgnoreCase);
+
+            void Add(string text, Action run) => items.Add((text, run));
+
+            if (isPrivate && !_provider.PrivateUnlocked)
+                Add("Unlock private folders...", UnlockFromWindow);
+            else if (!isPrivate)
+                Add("Mark as private (recursive)", () => _provider.SetFolderPrivate(id, true));
+            else if (isMarked)
+                Add("Unmark private (recursive)", () => _provider.SetFolderPrivate(id, false));
+            else
+                Add("Private through a parent folder", null);
+
+            return items;
+        }
+
+        void UnlockFromWindow()
+        {
+            var password = NativeDialogs.PasswordPrompt?.Invoke("Enter password for private folders");
+            if (password == null)
+                return; // cancelled, or no password prompt on this platform
+            if (!_provider.TryUnlockPrivate(password))
+                NativeDialogs.Show?.Invoke(new[] { "Wrong password" }, new[] { new MessageBoxButton() { Text = "OK", Action = () => { } } });
+        }
+
         void HandleKeyDown(KeyboardKeyEventArgs e)
         {
             switch (e.Key)
             {
                 case Keys.Escape:
-                    Close();
+                    if (_menuOpen)
+                        _menuOpen = false;
+                    else
+                        Close();
                     break;
                 case Keys.Up:
                     _cursor = Math.Max(0, _cursor - 1);
@@ -204,15 +338,28 @@ namespace Photos.Desktop
 
         void HandleMouseDown(MouseButtonEventArgs e)
         {
+            float x = MousePosition.X;
+            float y = MousePosition.Y;
+
+            if (_menuOpen)
+            {
+                _menuOpen = false;
+                int item = MenuItemAt(x, y);
+                if (item >= 0 && _menuItems[item].Run != null)
+                    _menuItems[item].Run();
+                return;
+            }
+
+            if (e.Button == MouseButton.Right)
+            {
+                OpenMenu(x, y);
+                return;
+            }
             if (e.Button != MouseButton.Left)
                 return;
 
-            float y = MousePosition.Y;
-            if (y < HeaderHeight)
-                return;
-
-            int index = (int)((y - HeaderHeight + _scroll) / RowHeight);
-            if (index < 0 || index >= _rows.Count)
+            int index = RowAt(y);
+            if (index < 0)
                 return;
 
             _cursor = index;

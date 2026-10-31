@@ -10,5 +10,8 @@ namespace Photos.Lib
     public static class NativeDialogs
     {
         public static Func<string[], MessageBoxButton[], bool> Show;
+
+        /// <summary>Asks for a password. Returns the text entered, or null when cancelled.</summary>
+        public static Func<string, string> PasswordPrompt;
     }
 }

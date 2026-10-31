@@ -342,6 +342,9 @@ namespace Photos.Core.StoredTypes
         /// <summary>Set once the default folder sort has been applied to this library.</summary>
         [Key("fsd")]
         public bool FolderSortApplied;
+        /// <summary>Folder ids marked private (see PrivateFolderRules). Stored with the added folders.</summary>
+        [Key("pf")]
+        public string[] PrivateFolders = Array.Empty<string>();
         [Key("di")]
         public string[] Dirs;
         [Key("fi2")]

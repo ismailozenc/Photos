@@ -12,6 +12,8 @@ namespace Photos.Core
     {
         public const string FolderFilter = "folder";
         public const string FavFilter = "favorite";
+        /// <summary>Set by the photo provider: true for files that must stay out of view.</summary>
+        public Func<FileRecord, bool> IsHidden = _ => false;
 
         private readonly Storage DB;
         Dictionary<string, FileFilterGroup> _filterLookup;
@@ -142,7 +144,7 @@ namespace Photos.Core
                 }).ToList();
 
                 var existingDirs = files.SelectMany(x => x.Src.Select(s => (s.D, x))).GroupBy(x => x.D)
-                    .Select(x => (dir: DB.Directories.GetValue(x.Key), cnt: x.Count(), d: x.Key))
+                    .Select(x => (dir: DB.Directories.GetValue(x.Key), cnt: x.Count(e => !IsHidden(e.x)), hidden: x.Count(e => IsHidden(e.x)), d: x.Key))
                     .ToList();
 
                 var allDirs = dirs.SelectMany(x =>
@@ -166,6 +168,7 @@ namespace Photos.Core
                 {
                     var subDirs = existingDirs.Where(e => e.dir.SourceId == x.SourceId && (x.dir == null || e.dir.IsSubdirectoryOf(x.dir))).ToList();
                     var count = subDirs.Sum(x => x.cnt);
+                    var hiddenCount = subDirs.Sum(x => x.hidden);
                     var set = new HashSet<int>(subDirs.Select(x => x.d));
                     if (x.dir != null)
                         libDirsSet.UnionWith(set);
@@ -177,9 +180,10 @@ namespace Photos.Core
                         PreText = DB.GetSourceName(x.SourceId),
                         //Filter = f => f.Src.Any(s => set.Contains(s.D)),
                         SrcFilter = s => set.Contains(s.D),
-                        Count = count
+                        Count = count,
+                        Hidden = hiddenCount
                     };
-                }).Where(x => x.Count > 0).ToList();
+                }).Where(x => x.Count > 0 || x.Hidden > 0).ToList();
                 _libDirsSet = libDirsSet;
 
                 for (int i = 1; i < folders.Count; i++) // remove empty path parts
@@ -411,5 +415,6 @@ namespace Photos.Core
         public Func<FileRecord, bool> Filter;
         public Func<SourceRecord, bool> SrcFilter;
         public required int Count;
+        public int Hidden; // files hidden by private folders; not part of Count
     }
 }

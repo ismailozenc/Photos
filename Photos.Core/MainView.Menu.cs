@@ -34,6 +34,13 @@ namespace Photos.Core
                 menu.Items.Add(new() { Text = "Thumbnail display size", Submenu = ShowThumbnailDisplaySizeMenu });
             }
 
+            if (photoProvider.HasPrivateFolders)
+                menu.Items.Add(new()
+                {
+                    Text = photoProvider.PrivateUnlocked ? "Lock private folders" : "Unlock private folders",
+                    OnClick = ToggleLockPrivate,
+                });
+
             menu.Items.Add(new() { Text = "Settings" });
             menu.Items.Add(new() { Text = "Photo library", Submenu = PhotoLibMenu });
             OnBuildPlatformSpecifiMenu?.Invoke(MenuSection.Main, menu);
@@ -65,6 +72,20 @@ namespace Photos.Core
                 Text = $"Debug mode: {(photoProvider.DB.Settings.DevMode ? "ON" : "OFF")}",
                 OnClick = () => photoProvider.DB.Settings = photoProvider.DB.Settings with { DevMode = !photoProvider.DB.Settings.DevMode }
             });
+        }
+
+        void ToggleLockPrivate()
+        {
+            if (photoProvider.PrivateUnlocked)
+            {
+                photoProvider.LockPrivate();
+                return;
+            }
+            var password = NativeDialogs.PasswordPrompt?.Invoke("Enter password for private folders");
+            if (password == null)
+                return; // cancelled, or no password prompt on this platform
+            if (!photoProvider.TryUnlockPrivate(password))
+                MainToast.Show("Wrong password");
         }
 
         void ShowDebugMenu(MenuDef menu)

@@ -13,7 +13,44 @@ namespace Photos.Desktop
     [SupportedOSPlatform("windows")]
     internal static class WinFormsDialogs
     {
-        public static void Register() => Photos.Lib.NativeDialogs.Show = Show;
+        public static void Register()
+        {
+            Photos.Lib.NativeDialogs.Show = Show;
+            Photos.Lib.NativeDialogs.PasswordPrompt = ShowPasswordPrompt;
+        }
+
+
+        static string ShowPasswordPrompt(string title)
+        {
+            // Same threading as the message boxes: a single-threaded apartment on its own thread.
+            string result = null;
+            var thread = new Thread(() => result = ShowPasswordForm(title));
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+            return result;
+        }
+
+        static string ShowPasswordForm(string title)
+        {
+            using var form = new Form
+            {
+                Text = title,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ShowInTaskbar = false,
+                StartPosition = FormStartPosition.CenterScreen,
+                ClientSize = new Size(320, 110),
+            };
+            var box = new TextBox { UseSystemPasswordChar = true, Location = new Point(12, 14), Width = 296 };
+            var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(146, 48), Width = 75 };
+            var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(233, 48), Width = 75 };
+            form.Controls.AddRange(new Control[] { box, ok, cancel });
+            form.AcceptButton = ok;
+            form.CancelButton = cancel;
+            return form.ShowDialog() == DialogResult.OK ? box.Text : null;
+        }
 
         static bool Show(string[] text, Photos.Lib.MessageBoxButton[] options)
         {
