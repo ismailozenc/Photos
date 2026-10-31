@@ -122,7 +122,7 @@ namespace Photos.Desktop
                     _monitors.Start();
                 }
             };
-            photoProvider.PhotoSelected += () => _monitors.ClosePreview();
+            photoProvider.PhotoSelected += () => _monitors.HidePreviewForPhoto();
             if (_monitors.Roles.Main is System.Drawing.Rectangle mainBounds)
                 MoveToDisplay(mainBounds);
 
@@ -182,6 +182,7 @@ namespace Photos.Desktop
 
             var mainView = new MainView(photoProvider);
             mainView.SlideshowRequested += StartSlideshowFromBrowse;
+            mainView.BrowseShown += () => _monitors.ShowPreviewIfHidden();
 
             if (OperatingSystem.IsWindows())
             {

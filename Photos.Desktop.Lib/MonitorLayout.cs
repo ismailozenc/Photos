@@ -2,6 +2,7 @@ using Photos.Core;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 
 namespace Photos.Desktop
 {
@@ -56,14 +57,34 @@ namespace Photos.Desktop
             }
         }
 
-        /// <summary>Closes the preview only, for example after a photo is opened in the main window.</summary>
-        public void ClosePreview()
+        bool _previewHiddenForPhoto;
+        PreviewWindow _hiddenPreview;
+
+        /// <summary>Closes the preview because a photo opened in the main window. It comes back when browse is shown again.</summary>
+        public void HidePreviewForPhoto()
         {
             foreach (var window in _windows)
-                if (window is PreviewWindow)
-                    window.Close(); // removed and disposed on the next Tick
+                if (window is PreviewWindow preview && !preview.IsExiting)
+                {
+                    _previewHiddenForPhoto = true;
+                    _hiddenPreview = preview;
+                    preview.Close(); // removed and disposed on the next Tick
+                }
         }
 
+        /// <summary>Brings the preview back after it was hidden for a photo. A preview closed with Escape stays closed.</summary>
+        public void ShowPreviewIfHidden()
+        {
+            if (!_previewHiddenForPhoto)
+                return;
+            _previewHiddenForPhoto = false;
+
+            if (IsRunning && Roles.Preview is Rectangle preview && !_windows.Any(w => w is PreviewWindow p && !p.IsExiting))
+            {
+                TryAdd(new PreviewWindow(_provider, preview));
+                _restoreMainContext();
+            }
+        }
         public void Stop()
         {
             if (_windows.Count == 0)
@@ -95,6 +116,8 @@ namespace Photos.Desktop
                 {
                     if (window.IsExiting)
                     {
+                        if (window is PreviewWindow && window != _hiddenPreview)
+                            _previewHiddenForPhoto = false; // closed with Escape: do not bring it back
                         window.Dispose();
                         _windows.RemoveAt(i);
                         continue;

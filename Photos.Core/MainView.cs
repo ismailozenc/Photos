@@ -24,6 +24,8 @@ namespace Photos.Core
         public MessageBox MessageBox => _mbox;
         public Menu MainMenu => mainMenu;
         public event Action SlideshowRequested;
+        /// <summary>Raised when the grid is shown again, for example after a photo is closed.</summary>
+        public event Action BrowseShown;
 
         public readonly Val<float> MenuButtonSize = new(-1);
         public readonly Val<float> ButtonSize = new(-1);
@@ -189,6 +191,7 @@ namespace Photos.Core
 
             _photoView.MainMenu = mainMenu;
             ThumbnailView.ItemContextRequested += ShowItemMenu;
+            ThumbnailView.Enabled.OnConstSet += (o, n) => { if (n) BrowseShown?.Invoke(); };
 
             _sizeSlider = new ThumbnailSizeSlider()
             {
