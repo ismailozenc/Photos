@@ -17,6 +17,7 @@ namespace Photos.Core
 
         PhotoView _photoView;
         CompareView _compareView;
+        ThumbnailSizeSlider _sizeSlider;
         public readonly ThumbnailView ThumbnailView;
         Menu mainMenu;
         public readonly Toast MainToast;
@@ -196,6 +197,16 @@ namespace Photos.Core
 
             mainMenu.SectionClick += MainMenu_SectionClick;
             _photoView.MainMenu = mainMenu;
+
+            _sizeSlider = new ThumbnailSizeSlider()
+            {
+                Link = Attach(() => InnerRect.Select(x => SKRect.Create(x.Right - 282, x.Bottom - 50, 272, 40))),
+                Enabled = { Func = () => ThumbnailView.Enabled },
+            };
+            _sizeSlider.OnChange = step => photoProvider.DB.Settings = photoProvider.DB.Settings with { ThumbnailDrawSize = ThumbnailSizes.Sizes[step] };
+            if (photoProvider.DB.Settings != null)
+                _sizeSlider.Index = ThumbnailSizes.SlotFor(photoProvider.DB.Settings.ThumbnailDrawSize);
+            photoProvider.DB.OnSettingsUpdate += (oldSettings, newSettings) => _sizeSlider.Index = ThumbnailSizes.SlotFor(newSettings.ThumbnailDrawSize);
 
             var statusToast = new Toast()
             {

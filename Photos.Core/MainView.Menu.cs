@@ -56,7 +56,6 @@ namespace Photos.Core
 
         public void SettingsMenu(MenuDef menu)
         {
-            menu.Items.Add(new() { Text = "Thumbnail index resolution", Submenu = ShowThumbnailSizeMenu });
 
             if (!photoProvider.IsIndexEmpty)
                 menu.Items.Add(new()
@@ -168,45 +167,14 @@ namespace Photos.Core
             menu.Items.AddRange(about);
         }
 
-        static (int, string)[] ThumbnailSizes = [
-            (224, "Mini"), (256, "Small"), (PhotoProvider.MediumThumbnailSize, "Medium"), 
-            (PhotoProvider.LargeThumbnailSize, "Large"), (768, "Huge"), (1080, "Full HD")];
         private void ShowThumbnailDisplaySizeMenu(MenuDef menu)
         {
-            menu.Items.AddRange(ThumbnailSizes.Concat([(-1, "Max")]).Select(x => new MenuItem()
-               {
-                   Text = $"{x.Item2} ({x.Item1}px)",
-                   OnClick = () => { photoProvider.DB.Settings = photoProvider.DB.Settings with { ThumbnailDrawSize = x.Item1 }; /*mainMenu.Close();*/ },
-                   Selected = () => photoProvider.DB.Settings.ThumbnailDrawSize == x.Item1
-               }));
-        }
-
-        void ShowFilterMenu(FileFilterGroup[] filterGroups)
-        {
-            mainMenu.Show(menu =>
+            menu.Items.AddRange(Enumerable.Range(0, ThumbnailSizes.Sizes.Length).Select(i => new MenuItem()
             {
-                menu.Title = "Filter";
-
-                photoProvider.FilterService.ActiveFiltersMenu(menu);
-
-                menu.Items.AddRange(filterGroups.Select(x => photoProvider.FilterService.ToMenuItem(x)));
-            });
-        }
-
-        private void ShowThumbnailSizeMenu(MenuDef menu)
-        {
-            menu.Items.AddRange(ThumbnailSizes.Select(x => new MenuItem()
-            {
-                Text = $"{x.Item2} ({x.Item1}px)",
-                Submenu = m => Menu.Confirm(m, $"Change resolution to {x.Item1}px", () => SetSize(x.Item1), new[] { 
-                    "Changed resultion only applies to new pictures",
-                    "Existing thumbnail will not be updated automatically",
-                    "Please manually clear the index to update existing thumbnails"
-                }),
-                Selected = () => photoProvider.DB.Settings.ThumbnailSize == x.Item1
+                Text = $"{ThumbnailSizes.Names[i]} ({ThumbnailSizes.Sizes[i]}px)",
+                OnClick = () => photoProvider.DB.Settings = photoProvider.DB.Settings with { ThumbnailDrawSize = ThumbnailSizes.Sizes[i] },
+                Selected = () => ThumbnailSizes.SlotFor(photoProvider.DB.Settings.ThumbnailDrawSize) == i,
             }));
-
-            void SetSize(int v) => photoProvider.DB.Settings = photoProvider.DB.Settings with { ThumbnailSize = v };
         }
 
         void PhotoLibMenu(MenuDef menu)
