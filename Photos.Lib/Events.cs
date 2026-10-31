@@ -50,12 +50,10 @@ namespace Photos.Lib
     public enum libMouseEventKind
     {
         Click,
-        AltClick,
         DragScroll,
         Wheel,
         FreeMove,
         Up,
-        AltUp,
         Down,
         Scale
     }

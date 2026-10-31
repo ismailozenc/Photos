@@ -30,9 +30,6 @@ namespace Photos.Core
         FileRecord lastShownFile;
         Replicator imgReplicator, groupReplicator;
 
-        public readonly HashSet<int> SelectedItems = new();
-        public bool SelectionActive => SelectedItems.Count > 0;
-
         public ThumbnailView(PhotoProvider photoProvider, Val<float> buttonSize)
         {
             ScrollContainer = new()
@@ -141,19 +138,6 @@ namespace Photos.Core
                     if (isDoubleClick)
                         photoProvider.SelectPhoto();
                 },
-                OnAltClick = () =>
-                {
-                    //(Window.RootView as MainView).MainToast.Show("ALT TEST");
-                    var imgIndex = photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex;
-                    if (!SelectedItems.Contains(imgIndex))
-                        SelectedItems.Add(imgIndex);
-                    else
-                        SelectedItems.Remove(imgIndex);
-                },
-                IsHighlighted = { Func = () => {
-                    var imgIndex = photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex;
-                    return SelectedItems.Contains(imgIndex);
-                } }
             };
 
             ScrollContainer.ScrollPositionHint = () =>

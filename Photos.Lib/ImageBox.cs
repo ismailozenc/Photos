@@ -11,7 +11,6 @@ namespace Photos.Lib
     {
         public Func<(SKImage, SKRect)> Image;
         public Action OnClick;
-        public Action OnAltClick;
         static SKPaint _paint = new ();
 
         public Val<bool> IsHighlighted = new Val<bool>(false);
@@ -36,7 +35,7 @@ namespace Photos.Lib
                 if (IsHighlighted)
                     ctx.DrawRect(OuterRect, Highlighted);
             };
-            MouseHandler = e => DetectClick(e, OnClick, OnAltClick);
+            MouseHandler = e => DetectClick(e, OnClick);
             Highlighted = new SKPaint() { Color = SKColors.Orange.WithAlpha(0x70), Style = SKPaintStyle.Fill, IsAntialias = true };
             OnDispose += () => Highlighted?.Dispose();
         }

@@ -278,7 +278,7 @@ namespace Photos.Lib
             return pos.HasValue ? ctx.TotalMatrix.MapRect(OuterRect).Contains(pos.Value) : false;
         }
 
-        public void DetectClick(libMouseEvent e, Action onClick, Action onAltClick = null)
+        public void DetectClick(libMouseEvent e, Action onClick)
         {
             if (Window.ManualClickDetection)
             {
@@ -290,11 +290,6 @@ namespace Photos.Lib
                         Invalidate();
                         onClick?.Invoke();
                     }
-                    else if (e.Kind == libMouseEventKind.AltUp)
-                    {
-                        Invalidate();
-                        onAltClick?.Invoke();
-                    }
                 }
             }
             else if (e.Kind == libMouseEventKind.Click)
@@ -302,12 +297,6 @@ namespace Photos.Lib
                 e.Consume(this);
                 Invalidate();
                 onClick?.Invoke();
-            }
-            else if (e.Kind == libMouseEventKind.AltClick)
-            {
-                e.Consume(this);
-                Invalidate();
-                onAltClick?.Invoke();
             }
             //else if (e.Kind == libMouseEventKind.DragScroll)
             //    e.Rejected = OuterRect.Contains(e.CurrentPoint);

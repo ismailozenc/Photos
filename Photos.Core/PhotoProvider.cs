@@ -593,22 +593,6 @@ namespace Photos.Core
             return res;
         }
 
-        public string GetLocalPath(FileRecord rec)
-        {
-            foreach (var src in rec.Src)
-            {
-                var dir = DB.Directories.GetValue(src.D);
-                if (dir.IsLocal())
-                {
-                    var fullPath = dir.CombinePath(src);
-                    if (fullPath != null && File.Exists(fullPath))
-                        return fullPath;
-                }
-            }
-
-            return null;
-        }
-
         
 
         public (string name, string path, byte[] data) GetImageForSharing(int idx)

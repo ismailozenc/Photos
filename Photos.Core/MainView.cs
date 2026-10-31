@@ -92,17 +92,6 @@ namespace Photos.Core
             photoProvider.PhotoSelected += () => ThumbnailView.Enabled.Const = false;
             _photoView.MenuButton.AdjustRect(x => x.OffsetRect(y: (WindowControlPanel.Enabled ? WindowControlPanel.Position.Bottom + ButtonPadding : 0)));
 
-            new TextLabel() // selectedItems
-            {
-                Link = Attach(() => SKRect.Create(0, Padding.Value.Top + ButtonSize + (BigButtonSize - TextLabelSize) / 2 + ButtonPadding, 
-                    InnerRect.Width - ButtonSize * 3 - ButtonPadding * 3, TextLabelSize)),
-                Padding = { Const = 3 },
-                Text = () => $"{ThumbnailView.SelectedItems.Count} items selected ",
-                TextAlign = { Const = SKTextAlign.Right },
-                Background = { Color = SKColors.Black },
-                Enabled = { Func = () => ThumbnailView.Enabled && ThumbnailView.SelectedItems.Count > 0 },
-            };
-
             ButtonPanel = new StackPanel()
             {
                 MeasureChild = x => BigButtonSize,
@@ -112,19 +101,11 @@ namespace Photos.Core
                 Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled },
             };
 
-            new Button() // clear selection
-            {
-                Link = ButtonPanel.Attach(),
-                Icon = { Const = IconStore.X },
-                OnClick = () => ThumbnailView.SelectedItems.Clear(),
-                Enabled = { Func = () => ThumbnailView.SelectionActive }
-            };
-
             new Button() // return to gallery
             {
                 Link = ButtonPanel.Attach(),
                 Icon = { Const = IconStore.ArrowLeft },
-                Enabled = { Func = () => photoProvider.IsSingleFolderMode && !ThumbnailView.SelectionActive },
+                Enabled = { Func = () => photoProvider.IsSingleFolderMode },
                 OnClick = () => photoProvider.CloseSingleFolderMode(),
             };
 
@@ -133,7 +114,7 @@ namespace Photos.Core
                 Link = ButtonPanel.Attach(),
                 Icon = { Const = IconStore.Play },
                 OnClick = () => SlideshowRequested?.Invoke(),
-                Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled && !ThumbnailView.SelectionActive && photoProvider.DisplayedCount > 0 }
+                Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled && photoProvider.DisplayedCount > 0 }
             };
 
             new Button() // menu
@@ -141,7 +122,6 @@ namespace Photos.Core
                 Link = ButtonPanel.Attach(),
                 Icon = { Const = IconStore.List },
                 OnClick = () => mainMenu.Show(MainMenuFunc),
-                Enabled = { Func = () => !ThumbnailView.SelectionActive }
             };
 
             new Button()
@@ -149,7 +129,7 @@ namespace Photos.Core
                 Link = ButtonPanel.Attach(),
                 Icon = { Const = IconStore.Folder },
                 OnClick = () => mainMenu.Show(m => photoProvider.FilterService.FilterMenu(m, photoProvider.FilterService.GetFilterGroup(FilterService.FolderFilter))),
-                Enabled = { Func = () => photoProvider.FilterService.FiltersReady && !photoProvider.IsSingleFolderMode && !ThumbnailView.SelectionActive },
+                Enabled = { Func = () => photoProvider.FilterService.FiltersReady && !photoProvider.IsSingleFolderMode },
                 IsHighlighted = { Func = () => photoProvider.FilterService.IsFilterGroupActive(FilterService.FolderFilter) }
             };
 
@@ -158,7 +138,7 @@ namespace Photos.Core
                 Link = ButtonPanel.Attach(),
                 Icon = { Const = IconStore.Funnel },
                 OnClick = () => ShowFilterMenu(photoProvider.FilterService.FilterGroups.Where(x => !x.HideInFilterList).ToArray()),
-                Enabled = { Func = () => photoProvider.FilterService.FiltersReady && !ThumbnailView.SelectionActive },
+                Enabled = { Func = () => photoProvider.FilterService.FiltersReady },
                 IsHighlighted = { Func = () => photoProvider.FilterService.GetActiveFilterTypes().Any(x => !x.HideInFilterList) }
             };
 
@@ -171,7 +151,7 @@ namespace Photos.Core
                     var fgr = photoProvider.FilterService.GetFilterGroup(FilterService.FavFilter);
                     photoProvider.FilterService.ToggleFilters(fgr, fgr.Filters.Values.Single());
                 },
-                Enabled = { Func = () => photoProvider.FilterService.FiltersReady && !ThumbnailView.SelectionActive },
+                Enabled = { Func = () => photoProvider.FilterService.FiltersReady },
                 IsHighlighted = { Func = () => photoProvider.FilterService.IsFilterGroupActive(FilterService.FavFilter) }
             };
 
@@ -290,7 +270,6 @@ namespace Photos.Core
 
             photoProvider.OnDisplayOrderUpdate += () => Window.Run(() =>
             {
-                ThumbnailView.SelectedItems.Clear(); 
                 Window.Invalidate();
             });
 

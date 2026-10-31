@@ -182,21 +182,6 @@ namespace Photos.Desktop
             var mainView = new MainView(photoProvider);
             mainView.SlideshowRequested += StartSlideshowFromBrowse;
 
-            new Button() // copy to clipboard
-            {
-                LinkFirst = mainView.ButtonPanel.Attach(),
-                Icon = { Const = IconStore.Copy },
-                OnClick = () =>
-                {
-                    var files = photoProvider.GetFiles(mainView.ThumbnailView.SelectedItems)
-                        .Select(x => photoProvider.GetLocalPath(x)).Where(x => x != null).ToArray();
-
-                    WindowsClipboardHelper.CopyFilesToClipboard(files);
-                    mainView.MainToast.Show("Files copied to clipboard");
-                },
-                Enabled = { Func = () => mainView.ThumbnailView.SelectionActive }
-            };
-
             if (OperatingSystem.IsWindows())
             {
                 mainView.OnBuildPlatformSpecifiMenu += (kind, menu) =>
@@ -290,18 +275,15 @@ namespace Photos.Desktop
 
         private void Game_MouseUp(MouseButtonEventArgs obj)
         {
+            if (obj.Button != MouseButton.Left) // right-click selection is removed
+                return;
+
             _window.RouteMouseEvent(new libMouseEvent(downEvent)
             {
-                Kind = obj.Button switch { MouseButton.Button2 => libMouseEventKind.AltUp, _ => libMouseEventKind.Up },
+                Kind = libMouseEventKind.Up,
                 CurrentPoint = MousePosition.ToSK(),
             });
 
-            //if (!moveAccepted)
-            //    _window.RouteMouseEvent(new libMouseEvent(downEvent)
-            //    {
-            //        Kind = obj.Button == MouseButton.Right ? libMouseEventKind.AltClick : libMouseEventKind.Click,
-            //        CurrentPoint = MousePosition.ToSK(),
-            //    });
         }
         private void Game_Closing(System.ComponentModel.CancelEventArgs obj)
         {
