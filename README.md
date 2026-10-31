@@ -1,6 +1,6 @@
 # μPhotos
 
-μPhotos is an open source GPU-accelerated cross platform immersive photo viewer and organizer. It is written in C# and uses the Skia 2D graphic library for drawing.
+μPhotos is an open source GPU-accelerated immersive photo viewer and organizer for Windows. It is written in C# and uses the Skia 2D graphic library for drawing.
 
 [Project website](https://www.bytificial.com/uPhotos)
 

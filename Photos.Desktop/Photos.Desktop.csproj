@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <StartupObject>Photos.Desktop.Program</StartupObject>
@@ -19,8 +19,5 @@
     <ProjectReference Include="..\Photos.Desktop.Lib\Photos.Desktop.Lib.csproj" />
   </ItemGroup>
   
-  <ItemGroup>
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" Condition="'$(RuntimeIdentifier)' == 'linux-x64' Or ('$(OS)' == 'UNIX' And '$(RuntimeIdentifier)' != 'win-x64')" />
-  </ItemGroup>
 
 </Project>

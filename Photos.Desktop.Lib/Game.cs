@@ -105,9 +105,7 @@ namespace Photos.Desktop
             base.OnLoad();
 
             DesktopImageLoader.Register();
-#if WINFORMS
             WinFormsDialogs.Register();
-#endif
             photoProvider = providerPromise.Result;
 
             bool transparentBackground = false;
@@ -174,13 +172,8 @@ namespace Photos.Desktop
                     var files = photoProvider.GetFiles(mainView.ThumbnailView.SelectedItems)
                         .Select(x => photoProvider.GetLocalPath(x)).Where(x => x != null).ToArray();
 
-                    string error = null;
-                    if (OperatingSystem.IsWindows())    
-                        WindowsClipboardHelper.CopyFilesToClipboard(files);
-                    else if (OperatingSystem.IsLinux())
-                        error = LinuxClipboardHelper.CopyFilesToClipboard(files);
-
-                    mainView.MainToast.Show(error ??"Files copied to clipboard");
+                    WindowsClipboardHelper.CopyFilesToClipboard(files);
+                    mainView.MainToast.Show("Files copied to clipboard");
                 },
                 Enabled = { Func = () => mainView.ThumbnailView.SelectionActive }
             };
@@ -219,26 +212,6 @@ namespace Photos.Desktop
                     }
                 };
             }
-            else if (OperatingSystem.IsLinux()) {
-                mainView.OnBuildPlatformSpecifiMenu += (kind, menu) =>
-                {
-                    if (kind == MenuSection.Settings)
-                    {
-                        menu.Items.Add(new()
-                        {
-                            Text = "Create start menu entry",
-                            ReturnLevel = Menu.CloseMenuLevel,
-                            OnClick = () =>
-                            {
-                                CreateLinuxIcon();
-
-                                mainView.MessageBox.Show(["Done!"],
-                                    new MessageBoxButton() { Text = "OK", Action = () => { } });
-                            }
-                        });
-                    }
-                };
-            }
 
             if (transparentBackground)
                 mainView.BackgroundColor = () => photoProvider.DB.Settings.IsOpaqueBackground ? SKColors.Black : SKColors.Black.WithAlpha(0xD0);
@@ -246,37 +219,6 @@ namespace Photos.Desktop
             _window.Initialize(mainView);
         }
 
-        private static void CreateLinuxIcon()
-        {
-            var exePath = System.Environment.ProcessPath;
-            var iconPath = Path.Combine(Path.GetDirectoryName(exePath), "Icon.png");
-            var appImage = Environment.GetEnvironmentVariable("APPIMAGE");
-            if (appImage != null)
-            {
-                exePath = appImage;
-                var iconFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local/share/icons/uPhotos.png");
-                if (!File.Exists(iconFilePath))
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(iconFilePath));
-                    File.WriteAllBytes(iconFilePath, GetIconStreams().OrderByDescending(x => x.size).First().buf);
-                }
-
-                iconPath = Path.GetFileNameWithoutExtension(iconFilePath);
-            }
-
-            File.WriteAllLines(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".local/share/applications/uPhotos.desktop"),
-            [
-                "[Desktop Entry]",
-                "Name=" + Core.Utils.AppName,
-                "Exec=" + exePath,
-                "Terminal=false",
-                "Type=Application",
-                "Icon=" + iconPath,
-                "Categories=Graphics;Viewer;Photography;",
-                "MimeType=image/gif;image/heif;image/jpeg;image/png;image/bmp;image/tiff"
-            ]);
-        }
 
         private void Game_MouseMove(MouseMoveEventArgs obj)
         {

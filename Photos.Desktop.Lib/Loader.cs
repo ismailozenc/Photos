@@ -76,7 +76,7 @@ public static class Loader
                     var editorDir = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
                     var provider = Task.Run(() => new PhotoProvider(dataPath, editorDir, openFile, folderLibraryMode: folderLibraryMode, setupEvents: photoProviderSetup));
 
-                    using var game = new Game(latinTitle || OperatingSystem.IsLinux(), provider, gameSetup);
+                    using var game = new Game(latinTitle, provider, gameSetup);
 
                     using var watcher = new FileSystemWatcher(dataPath, fname);
                     watcher.Created += (x, y) =>

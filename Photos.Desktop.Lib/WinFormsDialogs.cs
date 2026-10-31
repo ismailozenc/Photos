@@ -1,4 +1,3 @@
-#if WINFORMS
 using System;
 using System.Drawing;
 using System.Runtime.Versioning;
@@ -92,4 +91,3 @@ namespace Photos.Desktop.Lib
         }
     }
 }
-#endif
