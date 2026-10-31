@@ -108,16 +108,8 @@ namespace Photos.Core
                 MeasureChild = x => BigButtonSize,
                 ItemMargin = { Func = () => ButtonPadding },
                 Link = Attach(() => SKRect.Create(InnerRect.Right - BigButtonSize, (WindowControlPanel.Enabled ? WindowControlPanel.Position.Bottom : InnerRect.Top) + ButtonPadding,
-                    BigButtonSize, (BigButtonSize + ButtonPadding) * 4 - ButtonPadding)),
+                    BigButtonSize, (BigButtonSize + ButtonPadding) * 5 - ButtonPadding)),
                 Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled },
-            };
-
-            new Button() // slideshow on all screens, browse mode only
-            {
-                Link = Attach(() => SKRect.Create(InnerRect.Left + ButtonPadding, InnerRect.Bottom - BigButtonSize - ButtonPadding, BigButtonSize, BigButtonSize)),
-                Icon = { Const = IconStore.Play },
-                OnClick = () => SlideshowRequested?.Invoke(),
-                Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled && photoProvider.DisplayedCount > 0 }
             };
 
             new Button() // clear selection
@@ -134,6 +126,14 @@ namespace Photos.Core
                 Icon = { Const = IconStore.ArrowLeft },
                 Enabled = { Func = () => photoProvider.IsSingleFolderMode && !ThumbnailView.SelectionActive },
                 OnClick = () => photoProvider.CloseSingleFolderMode(),
+            };
+
+            new Button() // slideshow on all screens, browse mode only
+            {
+                Link = ButtonPanel.Attach(),
+                Icon = { Const = IconStore.Play },
+                OnClick = () => SlideshowRequested?.Invoke(),
+                Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled && !ThumbnailView.SelectionActive && photoProvider.DisplayedCount > 0 }
             };
 
             new Button() // menu
