@@ -15,6 +15,11 @@ namespace Photos.Lib
         public SKPaint OverlayPaint;
         public Func<SKRect> DialogRect;
         public bool Modal = true;
+        public bool Dim = true;
+        /// <summary>When set, a click outside the dialog runs OnOutsideClick and is not passed on.</summary>
+        public bool CloseOnOutsideClick;
+        public Action OnOutsideClick;
+        bool _outsideDown;
 
         public Dialog()
         {
@@ -23,6 +28,24 @@ namespace Photos.Lib
 
             MouseHandler = e =>
             {
+                if (CloseOnOutsideClick)
+                {
+                    bool inside = DialogContainer.Position.Contains(e.CurrentPoint);
+                    if (e.Kind == libMouseEventKind.Down && !inside)
+                    {
+                        _outsideDown = true;
+                        OnOutsideClick?.Invoke();
+                    }
+                    if (_outsideDown)
+                    {
+                        // swallow the rest of this click so the view underneath does not react to it
+                        if (e.Kind == libMouseEventKind.Up)
+                            _outsideDown = false;
+                        e.Consume(null);
+                        return;
+                    }
+                }
+
                 if (Modal)
                     e.Consume(null);
             };
@@ -43,7 +66,8 @@ namespace Photos.Lib
 
         void RenderFrame(SKCanvas ctx)
         {
-            ctx.DrawRect(OuterRect, OverlayPaint);
+            if (Dim)
+                ctx.DrawRect(OuterRect, OverlayPaint);
 
             var rect = DialogContainer.Position;
             var roundRect = new SKRoundRect(rect, 3);

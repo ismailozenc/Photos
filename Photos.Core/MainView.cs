@@ -18,7 +18,7 @@ namespace Photos.Core
         public readonly ThumbnailView ThumbnailView;
         Menu mainMenu;
         readonly Menu _itemMenu;
-        SKRect _itemMenuRect;
+        SKPoint _itemMenuAnchor;
         public readonly Toast MainToast;
         readonly MessageBox _mbox;
         public MessageBox MessageBox => _mbox;
@@ -185,9 +185,12 @@ namespace Photos.Core
             _itemMenu = new Menu()
             {
                 Link = Attach(() => OuterRect),
-                DialogRect = () => _itemMenuRect,
-                ButtonSize = { Func = () => MenuButtonSize }
+                DialogRect = ItemMenuRect,
+                ButtonSize = { Func = () => MenuButtonSize.Value * 0.8f },
+                Dim = false,
+                CloseOnOutsideClick = true,
             };
+            _itemMenu.OnOutsideClick = _itemMenu.Close;
 
             _photoView.MainMenu = mainMenu;
             ThumbnailView.ItemContextRequested += ShowItemMenu;

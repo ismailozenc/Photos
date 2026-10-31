@@ -227,15 +227,22 @@ namespace Photos.Core
             MainToast.Show(error == null ? successText : $"Failed: {error}");
         }
 
-        /// <summary>Opens the menu next to the pointer, kept inside the window.</summary>
+        /// <summary>The browse menu's rectangle: next to the pointer, sized to the items of the level being shown.</summary>
+        SKRect ItemMenuRect()
+        {
+            const float width = 300, padding = 10;
+            float row = _itemMenu.ButtonSize.Value + 6; // one row, with the spacing the menu uses
+            int rows = (_itemMenu.ActiveMenu?.Items?.Count ?? 1) + 1; // plus the title row
+            float height = Math.Min(rows * row + padding * 2, Size.Height - 8);
+            float x = Math.Clamp(_itemMenuAnchor.X + 8, 4, Size.Width - width - 4);
+            float y = Math.Clamp(_itemMenuAnchor.Y + 8, 4, Size.Height - height - 4);
+            return SKRect.Create(x, y, width, height);
+        }
+
+        /// <summary>Opens the browse menu next to the pointer.</summary>
         void ShowItemMenuAt(List<MenuItem> items, int count)
         {
-            var pointer = Window.MousePosition() ?? new SKPoint(Size.Width / 2, Size.Height / 2);
-            const float width = 240, rowHeight = 40, padding = 8;
-            float height = items.Count * rowHeight + padding * 2;
-            float x = Math.Clamp(pointer.X + 8, 4, Size.Width - width - 4);
-            float y = Math.Clamp(pointer.Y + 8, 4, Size.Height - height - 4);
-            _itemMenuRect = SKRect.Create(x, y, width, height);
+            _itemMenuAnchor = Window.MousePosition() ?? new SKPoint(Size.Width / 2, Size.Height / 2);
             _itemMenu.Show(m =>
             {
                 m.Title = count == 1 ? "Image" : $"{count} images selected";
