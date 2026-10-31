@@ -100,7 +100,7 @@ namespace Photos.Desktop
                         continue;
                     }
 
-                    window.RenderFrame();
+                    window.DrawAndPresent();
                 }
                 catch (Exception ex)
                 {

@@ -45,7 +45,7 @@ namespace Photos.Desktop
         {
             _provider = provider;
             _index = startIndex;
-            KeyDown += OnKeyDown;
+            KeyDown += HandleKeyDown;
         }
 
         /// <summary>Creates the Skia context and loads the first photo. Call once, after construction.</summary>
@@ -62,7 +62,7 @@ namespace Photos.Desktop
         }
 
         /// <summary>Advances when due and redraws when something changed.</summary>
-        public void RenderFrame()
+        public void DrawAndPresent()
         {
             if (_skiaCtx == null || IsExiting)
                 return;
@@ -148,7 +148,7 @@ namespace Photos.Desktop
             _dirty = true;
         }
 
-        void OnKeyDown(KeyboardKeyEventArgs e)
+        void HandleKeyDown(KeyboardKeyEventArgs e)
         {
             switch (e.Key)
             {

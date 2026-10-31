@@ -1,6 +1,7 @@
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using Photos.Core;
+using Photos.Core.StoredTypes;
 using SkiaSharp;
 using System;
 using System.Drawing;
@@ -23,7 +24,7 @@ namespace Photos.Desktop
             : base(bounds.X, bounds.Y, bounds.Width, bounds.Height, Core.Utils.LatinAppName)
         {
             _provider = provider;
-            KeyDown += OnKeyDown;
+            KeyDown += HandleKeyDown;
         }
 
         protected override void Advance()
@@ -37,10 +38,10 @@ namespace Photos.Desktop
                 return;
 
             _loadedFile = file;
-            Load(file);
+            LoadPhoto(file);
         }
 
-        void Load(FileRecord file)
+        void LoadPhoto(FileRecord file)
         {
             _image?.Dispose();
             _image = null;
@@ -79,7 +80,7 @@ namespace Photos.Desktop
             }
         }
 
-        void OnKeyDown(KeyboardKeyEventArgs e)
+        void HandleKeyDown(KeyboardKeyEventArgs e)
         {
             switch (e.Key)
             {

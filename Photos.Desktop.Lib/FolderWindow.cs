@@ -34,9 +34,9 @@ namespace Photos.Desktop
             : base(bounds.X, bounds.Y, bounds.Width, bounds.Height, Core.Utils.LatinAppName)
         {
             _provider = provider;
-            KeyDown += OnKeyDown;
-            MouseDown += OnMouseDown;
-            MouseWheel += OnMouseWheel;
+            KeyDown += HandleKeyDown;
+            MouseDown += HandleMouseDown;
+            MouseWheel += HandleMouseWheel;
         }
 
         protected override void Advance()
@@ -117,7 +117,7 @@ namespace Photos.Desktop
             _provider.FilterService.ToggleFilters(_group, _rows[index]);
         }
 
-        void OnKeyDown(KeyboardKeyEventArgs e)
+        void HandleKeyDown(KeyboardKeyEventArgs e)
         {
             switch (e.Key)
             {
@@ -140,7 +140,7 @@ namespace Photos.Desktop
             }
         }
 
-        void OnMouseDown(MouseButtonEventArgs e)
+        void HandleMouseDown(MouseButtonEventArgs e)
         {
             if (e.Button != MouseButton.Left)
                 return;
@@ -157,7 +157,7 @@ namespace Photos.Desktop
             Toggle(index);
         }
 
-        void OnMouseWheel(MouseWheelEventArgs e)
+        void HandleMouseWheel(MouseWheelEventArgs e)
         {
             _scroll = Math.Clamp(_scroll - e.OffsetY * RowHeight, 0, MaxScroll(ClientSize.Y));
         }

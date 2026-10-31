@@ -51,7 +51,7 @@ namespace Photos.Desktop
         /// <summary>Frees photos and other resources. The Skia context is still alive when this runs.</summary>
         protected virtual void ReleaseResources() { }
 
-        public void RenderFrame()
+        public void DrawAndPresent()
         {
             if (_skiaCtx == null || IsExiting)
                 return;
