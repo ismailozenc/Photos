@@ -259,6 +259,17 @@ namespace Photos.Core
                     FilesSettings.Version = 1;
                 }
 
+                if (FilesSettings.Version == 1)
+                {
+                    // Version 2 stores every thumbnail size. Clear the old thumbnails so the library is
+                    // indexed again. Favourites, ratings and tags are kept (they are stored by content).
+                    _files.Clear();
+                    _filesBySource.Clear();
+                    Thumbnails.Truncate();
+                    MicroThumbnails.Truncate();
+                    FilesSettings.Version = 2;
+                }
+
                 if (FilesSettings.Version != FileRecord.CurrentHeaderVersion)
                     throw new Exception("Index upgrade error");
             }

@@ -505,7 +505,8 @@ namespace Photos.Core
 
             if (res == null && !fast && initTask.IsCompleted)
             {
-                var largeImage = GetFullThumbnail(rec);
+                using var stored = GetSlotThumbnail(rec, ThumbnailSizes.SlotFor(DB.Settings.ThumbnailDrawSize));
+                var largeImage = stored ?? GetFullThumbnail(rec);
                 using var bmp = PhotoIndexer.ScaleImage(largeImage, DB.Settings.ThumbnailDrawSize, GetImageDimsAfterOrientation(rec));
                 res = SKImage.FromBitmap(bmp);
                 _scaledThumbnails.Put(rec.Sig, res);
@@ -536,6 +537,19 @@ namespace Photos.Core
 
         readonly SKBitmap _errorThumbnail = ToThumbnail(IconStore.EmojiDizzy);
         readonly SKImage _errorImage;
+        /// <summary>The stored thumbnail of one size, or null if it can not be read.</summary>
+        SKImage GetSlotThumbnail(FileRecord file, int slot)
+        {
+            byte[] buf = null;
+            if (file.SizePos != null && file.SizeLen != null && slot < file.SizePos.Length && file.SizeLen[slot] > 0)
+                buf = DB.Thumbnails.Read(file.SizePos[slot], file.SizeLen[slot]);
+            if (buf == null || buf.Length == 0)
+                return null;
+
+            using var data = SKData.CreateCopy(buf);
+            return ImageLoader.DecodeThumbnail(data, DB.GetOrientation(file));
+        }
+
         public SKImage GetFullThumbnail(FileRecord file)
         {
             if (file.IndexFailed)

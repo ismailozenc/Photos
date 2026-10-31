@@ -306,7 +306,7 @@ namespace Photos.Core
             else
             {
                 var (micro, thumb) = IndexProvider(file);
-                SaveThumbnails(file, thumb, micro);
+                SaveThumbnails(file, new byte[][] { thumb, thumb, thumb, thumb }, micro);
                 return;
             }
         }
@@ -372,23 +372,33 @@ namespace Photos.Core
         const int MicroThumbnailSize = 64;
         void IndexFileCpu(FileRecord file, FullImageData skData)
         {
-            byte[] buf, microBuf;
+            byte[][] slots;
+            byte[] microBuf;
 
             try
             {
-                ImageLoader.DecodeAndResizeImage(skData, ImageLoader.ScaleToMinSide(DB.Settings.ThumbnailSize, 0));
+                ImageLoader.DecodeAndResizeImage(skData, ImageLoader.ScaleToMinSide(ThumbnailSizes.Large, 0));
 
                 if (skData.Bitmap == null)
-                    buf = microBuf = null;
+                {
+                    slots = null;
+                    microBuf = null;
+                }
                 else
                 {
                     file.W = skData.Width;
                     file.H = skData.Height;
 
-                    using var data = skData.Bitmap.Encode(SKEncodedImageFormat.Jpeg, 85);
-                    buf = data.ToArray();
+                    var large = skData.Bitmap;
+                    slots = new byte[ThumbnailSizes.Sizes.Length][];
+                    slots[ThumbnailSizes.Sizes.Length - 1] = EncodeJpeg(large);
+                    for (int i = 0; i < ThumbnailSizes.Sizes.Length - 1; i++)
+                    {
+                        using var smaller = ResizeToMinSide(large, ThumbnailSizes.Sizes[i]);
+                        slots[i] = EncodeJpeg(smaller ?? large);
+                    }
 
-                    using var tmpImg = SKImage.FromBitmap(skData.Bitmap);
+                    using var tmpImg = SKImage.FromBitmap(large);
                     using var micro = ScaleImage(tmpImg, MicroThumbnailSize, new SKSizeI(file.W, file.H));
                     using var data2 = micro.Encode(SKEncodedImageFormat.Jpeg, 85);
                     microBuf = data2.ToArray();
@@ -399,7 +409,29 @@ namespace Photos.Core
                 skData.Dispose();
             }
 
-            SaveThumbnails(file, buf, microBuf);
+            SaveThumbnails(file, slots, microBuf);
+        }
+
+        static byte[] EncodeJpeg(SKBitmap bitmap)
+        {
+            using var data = bitmap.Encode(SKEncodedImageFormat.Jpeg, 85);
+            return data.ToArray();
+        }
+
+        /// <summary>Downscales so the shorter side is <paramref name="minSide"/>. Returns null when no downscale is needed.</summary>
+        static SKBitmap ResizeToMinSide(SKBitmap source, int minSide)
+        {
+            float scale = minSide / (float)Math.Min(source.Width, source.Height);
+            if (scale >= 1)
+                return null;
+
+            var res = new SKBitmap(Math.Max(1, (int)Math.Round(source.Width * scale)), Math.Max(1, (int)Math.Round(source.Height * scale)), source.ColorType, source.AlphaType);
+            if (!source.ScalePixels(res, Lib.BaseView.HighQualitySampling))
+            {
+                res.Dispose();
+                return null;
+            }
+            return res;
         }
 
         internal static SKBitmap ScaleImage(SKImage largeImage, int size, SKSizeI origSize)
@@ -425,9 +457,9 @@ namespace Photos.Core
 
         object _saveLock = new object();
 
-        private void SaveThumbnails(FileRecord file, byte[] buf, byte[] microBuf)
+        private void SaveThumbnails(FileRecord file, byte[][] slots, byte[] microBuf)
         {
-            if (microBuf == null || buf == null)
+            if (microBuf == null || slots == null)
             {
                 file.IndexFailed = true;
                 return;
@@ -436,9 +468,18 @@ namespace Photos.Core
             if (!CancelIndex)
                 lock (_saveLock)
                 {
-                    file.T = DB.Thumbnails.CurrentPos;
-                    DB.Thumbnails.Write(buf);
-                    file.TS = buf.Length;
+                    file.SizePos = new long[slots.Length];
+                    file.SizeLen = new int[slots.Length];
+                    for (int i = 0; i < slots.Length; i++)
+                    {
+                        file.SizePos[i] = DB.Thumbnails.CurrentPos;
+                        DB.Thumbnails.Write(slots[i]);
+                        file.SizeLen[i] = slots[i].Length;
+                    }
+
+                    // The largest size is also kept in the single-thumbnail fields.
+                    file.T = file.SizePos[slots.Length - 1];
+                    file.TS = file.SizeLen[slots.Length - 1];
 
                     file.MT = DB.MicroThumbnails.CurrentPos;
                     DB.MicroThumbnails.Write(microBuf);

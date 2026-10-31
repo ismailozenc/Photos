@@ -121,6 +121,12 @@ namespace Photos.Core.StoredTypes
         /// </summary>
         [Key(8)]
         public int MTS;
+        /// <summary>Position of each stored thumbnail size in the thumbnail file (see ThumbnailSizes).</summary>
+        [Key(12)]
+        public long[] SizePos;
+        /// <summary>Byte length of each stored thumbnail size.</summary>
+        [Key(13)]
+        public int[] SizeLen;
 
         [Key(9)]
         public SourceRecord[] Src;
@@ -237,7 +243,7 @@ namespace Photos.Core.StoredTypes
 
         public bool IsIndexed() => Sig != 0 && TS != 0 && MTS != 0;
 
-        public const int CurrentHeaderVersion = 1;
+        public const int CurrentHeaderVersion = 2;
         const int DegreeMultiply = 1_000_000;
         static List<(GeoCoordinate coord, string country, string title, int radius)> _cities;
 
