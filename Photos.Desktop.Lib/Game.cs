@@ -30,6 +30,7 @@ namespace Photos.Desktop
     public class Game : GameWindow
     {
         GRContext skiaCtx;
+        SlideshowController _slideshows;
         SKSurface skSurface;
 
         PhotoProvider photoProvider;
@@ -108,6 +109,7 @@ namespace Photos.Desktop
             WinFormsDialogs.Register();
             Core.Utils.Log($"Displays detected: {string.Join(", ", ScreenDetection.GetDisplayBounds())}");
             photoProvider = providerPromise.Result;
+            _slideshows = new SlideshowController(photoProvider, () => Context.MakeCurrent());
 
             bool transparentBackground = false;
             if (OperatingSystem.IsWindows())
@@ -216,6 +218,23 @@ namespace Photos.Desktop
 
             if (transparentBackground)
                 mainView.BackgroundColor = () => photoProvider.DB.Settings.IsOpaqueBackground ? SKColors.Black : SKColors.Black.WithAlpha(0xD0);
+
+            mainView.OnBuildPlatformSpecifiMenu += (kind, menu) =>
+            {
+                if (kind == MenuSection.Main)
+                    menu.Items.Add(new()
+                    {
+                        Text = _slideshows.IsRunning ? "Stop slideshow on all screens" : "Slideshow on all screens",
+                        ReturnLevel = Menu.CloseMenuLevel,
+                        OnClick = () =>
+                        {
+                            if (_slideshows.IsRunning)
+                                _slideshows.Stop();
+                            else
+                                _slideshows.Start();
+                        }
+                    });
+            };
 
             _window.Initialize(mainView);
         }
@@ -347,6 +366,8 @@ namespace Photos.Desktop
         }
         protected override void OnRenderFrame(FrameEventArgs args)
         {
+            if (_slideshows != null && _slideshows.IsRunning)
+                _slideshows.Tick();
 
             if (ClientSize == default || IsViewValid || skSurface == null)
                 return;
@@ -361,6 +382,7 @@ namespace Photos.Desktop
 
         protected override void OnUnload()
         {
+            _slideshows?.Stop();
             skiaCtx?.Dispose();
             skSurface?.Dispose();
             base.OnUnload();
