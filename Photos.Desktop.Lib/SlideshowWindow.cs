@@ -73,9 +73,8 @@ namespace Photos.Desktop
             if (!_paused && _timer.ElapsedMilliseconds >= IntervalMs)
                 Step(1);
 
-            if (!_dirty)
-                return;
-
+            // Present every tick: the OS can discard a window's contents, which would leave it
+            // blank until the next photo change.
             _dirty = false;
             Draw();
             _skiaCtx.Flush();

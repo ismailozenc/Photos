@@ -31,6 +31,8 @@ namespace Photos.Desktop
     {
         GRContext skiaCtx;
         SlideshowController _slideshows;
+        MonitorLayout _monitors;
+        bool _monitorsAutoStart = true;
         SKSurface skSurface;
 
         PhotoProvider photoProvider;
@@ -110,6 +112,9 @@ namespace Photos.Desktop
             Core.Utils.Log($"Displays detected: {string.Join(", ", ScreenDetection.GetDisplayBounds())}");
             photoProvider = providerPromise.Result;
             _slideshows = new SlideshowController(photoProvider, () => Context.MakeCurrent());
+            _monitors = new MonitorLayout(photoProvider, () => Context.MakeCurrent());
+            if (_monitors.Roles.Main is System.Drawing.Rectangle mainBounds)
+                MoveToDisplay(mainBounds);
 
             bool transparentBackground = false;
             if (OperatingSystem.IsWindows())
@@ -232,6 +237,23 @@ namespace Photos.Desktop
                                 _slideshows.Stop();
                             else
                                 _slideshows.Start();
+                        }
+                    });
+            };
+
+            mainView.OnBuildPlatformSpecifiMenu += (kind, menu) =>
+            {
+                if (kind == MenuSection.Main)
+                    menu.Items.Add(new()
+                    {
+                        Text = _monitors.IsRunning ? "Stop monitor layout" : "Monitor layout (folders and preview)",
+                        ReturnLevel = Menu.CloseMenuLevel,
+                        OnClick = () =>
+                        {
+                            if (_monitors.IsRunning)
+                                _monitors.Stop();
+                            else
+                                _monitors.Start();
                         }
                     });
             };
@@ -364,10 +386,26 @@ namespace Photos.Desktop
 
             IsViewValid = false;
         }
+        void MoveToDisplay(System.Drawing.Rectangle bounds)
+        {
+            if (WindowState == WindowState.Maximized)
+                WindowState = WindowState.Normal;
+            Location = new Vector2i(bounds.X + 100, bounds.Y + 100);
+            WindowState = WindowState.Maximized;
+        }
+
         protected override void OnRenderFrame(FrameEventArgs args)
         {
             if (_slideshows != null && _slideshows.IsRunning)
                 _slideshows.Tick();
+
+            if (_monitorsAutoStart && _monitors != null)
+            {
+                _monitorsAutoStart = false;
+                if (_monitors.Roles.HasSecondaryRoles)
+                    _monitors.Start();
+            }
+            _monitors?.Tick();
 
             if (ClientSize == default || IsViewValid || skSurface == null)
                 return;
@@ -382,6 +420,7 @@ namespace Photos.Desktop
 
         protected override void OnUnload()
         {
+            _monitors?.Stop();
             _slideshows?.Stop();
             skiaCtx?.Dispose();
             skSurface?.Dispose();
