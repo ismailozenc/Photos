@@ -348,6 +348,9 @@ namespace Photos.Core.StoredTypes
         /// <summary>Deleted photos as "trashed full path|original full path". Restored entries are removed.</summary>
         [Key("dor")]
         public string[] DeletedOriginals = Array.Empty<string>();
+        /// <summary>Folder ids hidden from browse and slideshows. Only the folder itself, not its subfolders.</summary>
+        [Key("exf")]
+        public string[] ExcludedFolders = Array.Empty<string>();
         [Key("di")]
         public string[] Dirs;
         [Key("fi2")]

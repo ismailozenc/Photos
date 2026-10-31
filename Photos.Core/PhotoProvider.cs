@@ -310,11 +310,11 @@ namespace Photos.Core
                 var files = GetLibraryFiles(out var dirs);
                 TotalCount = files.Count;
 
-                FilterService.IsHidden = f => IsPrivateHidden(f) || IsFullyTrashed(f);
+                FilterService.IsHidden = f => IsPrivateHidden(f) || IsFullyTrashed(f) || IsFullyExcluded(f);
                 if (!skipFilters)
                     FilterService.RefreshFilters(files, dirs.Where(x => x != null), initTask != null);
 
-                files = files.Where(f => !IsPrivateHidden(f) && (ShowDeleted ? HasTrashedSource(f) : !IsFullyTrashed(f))).ToList(); // private folders and the open view
+                files = files.Where(f => !IsPrivateHidden(f) && (ShowDeleted ? HasTrashedSource(f) : !IsFullyTrashed(f) && !IsFullyExcluded(f))).ToList(); // private, hidden folders and the open view
                 FilterService.FilterFiles(files);
 
                 if (FilterService.CurrentSortMode == SortModeEnum.Filename)
@@ -388,6 +388,34 @@ namespace Photos.Core
                 postUpdate();
                 return null;
             }
+        }
+
+        /// <summary>True when the folder itself is hidden from browse and slideshows (subfolders are not affected).</summary>
+        public bool IsExcludedFolder(string folderId) =>
+            (DB.Settings.ExcludedFolders ?? Array.Empty<string>()).Contains(folderId, StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>True when this copy lies directly in a folder hidden from browse and slideshows.</summary>
+        public bool IsExcludedSource(SourceRecord s)
+        {
+            if (!IsAnyExcludedFolder)
+                return false;
+            var dir = DB.Directories.GetValue(s.D);
+            return dir != null && IsExcludedFolder($"{dir.SourceId}/{dir.Directory.ToLowerInvariant()}");
+        }
+
+        bool IsAnyExcludedFolder => (DB.Settings.ExcludedFolders?.Length ?? 0) > 0;
+
+        /// <summary>A photo is hidden only when every copy is in a hidden folder.</summary>
+        public bool IsFullyExcluded(FileRecord file) => file.Src.All(IsExcludedSource);
+
+        public void SetFolderExcluded(string folderId, bool excluded)
+        {
+            var ids = (DB.Settings.ExcludedFolders ?? Array.Empty<string>())
+                .Where(x => !string.Equals(x, folderId, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (excluded)
+                ids.Add(folderId);
+            DB.Settings = DB.Settings with { ExcludedFolders = ids.ToArray() };
+            EnqueueRefreshDisplayOrder();
         }
 
         public const string DeletedFolderName = "deleted images";

@@ -99,6 +99,8 @@ namespace Photos.Desktop
             using var countPaint = new SKPaint { Color = SKColors.Gray, IsAntialias = true };
             using var hiddenPaint = new SKPaint { Color = SKColors.Orange, IsAntialias = true };
             using var selectionPaint = new SKPaint { Color = SKColor.Parse("#33FFFFFF") };
+            using var folderPaint = new SKPaint { Color = SKColor.Parse("#4D4CAF50") };
+            using var excludedPaint = new SKPaint { Color = SKColors.Gray, IsAntialias = true };
             using var font = new SKFont(SKTypeface.Default, 18);
             using var titleFont = new SKFont(SKTypeface.Default, 20);
 
@@ -120,6 +122,11 @@ namespace Photos.Desktop
                     continue;
 
                 var row = _rows[i];
+                bool selectedFolder = _provider.TrashFolderIds.Contains(row.Id)
+                    ? _provider.ShowDeleted
+                    : _group != null && _provider.FilterService.IsFilterActive(_group, row);
+                if (selectedFolder)
+                    canvas.DrawRect(SKRect.Create(0, top, width, RowHeight), folderPaint);
                 if (i == _cursor)
                     canvas.DrawRect(SKRect.Create(0, top, width, RowHeight), selectionPaint);
 
@@ -130,7 +137,10 @@ namespace Photos.Desktop
                 bool isPrivate = IsPrivateRow(row.Id);
                 bool active = _provider.TrashFolderIds.Contains(row.Id) ? _provider.ShowDeleted : _group != null && _provider.FilterService.IsFilterActive(_group, row);
                 float baseline = top + RowHeight * 0.7f;
-                var namePaint = isPrivate ? privatePaint : active ? activePaint : textPaint;
+                bool excluded = _provider.IsExcludedFolder(row.Id);
+                if (excluded)
+                    name += " (hidden)";
+                var namePaint = isPrivate ? privatePaint : excluded ? excludedPaint : active ? activePaint : textPaint;
                 canvas.DrawText(name, Padding + depth * IndentStep, baseline, font, namePaint);
 
                 // shown / total known images; the part that is not shown is drawn in colour
@@ -302,6 +312,10 @@ namespace Photos.Desktop
                 Add("Unmark private (recursive)", () => _provider.SetFolderPrivate(id, false));
             else
                 Add("Private through a parent folder", null);
+
+            bool hidden = _provider.IsExcludedFolder(id);
+            Add(hidden ? "Show in browse and slideshows" : "Hide from browse and slideshows (this folder only)",
+                () => _provider.SetFolderExcluded(id, !hidden));
 
             return items;
         }
