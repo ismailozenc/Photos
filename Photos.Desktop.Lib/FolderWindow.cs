@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Drawing;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace Photos.Desktop
 {
@@ -28,6 +30,8 @@ namespace Photos.Desktop
         FileFilterGroup _group;
         List<FileFilter> _rows = new List<FileFilter>();
         int _cursor;
+        readonly Dictionary<string, int> _totals = new Dictionary<string, int>(); // -1 = unknown
+        Task<Dictionary<string, int>> _countTask;
         float _scroll;
 
         public FolderWindow(PhotoProvider provider, Rectangle bounds)
@@ -49,6 +53,30 @@ namespace Photos.Desktop
             _rows = _group?.Filters.Values.OrderBy(f => f.PreText).ThenBy(f => f.Text).ToList() ?? new List<FileFilter>();
             _cursor = Math.Clamp(_cursor, 0, Math.Max(0, _rows.Count - 1));
             _scroll = Math.Clamp(_scroll, 0, MaxScroll(ClientSize.Y));
+
+            if (_countTask != null && _countTask.IsCompleted)
+            {
+                foreach (var pair in _countTask.Result)
+                    _totals[pair.Key] = pair.Value;
+                _countTask = null;
+            }
+
+            if (_countTask == null)
+            {
+                var pending = new List<(string Id, string Dir)>();
+                foreach (var row in _rows)
+                {
+                    if (_totals.ContainsKey(row.Id))
+                        continue;
+                    var dir = LocalPath(row.Id);
+                    if (dir == null)
+                        _totals[row.Id] = -1;
+                    else
+                        pending.Add((row.Id, dir));
+                }
+                if (pending.Count > 0)
+                    _countTask = Task.Run(() => CountImageFiles(pending));
+            }
         }
 
         protected override void DrawFrame(SKCanvas canvas, int width, int height)
@@ -91,10 +119,44 @@ namespace Photos.Desktop
                 bool active = _group != null && _provider.FilterService.IsFilterActive(_group, row);
                 float baseline = top + RowHeight * 0.7f;
                 canvas.DrawText(name, Padding + depth * IndentStep, baseline, font, active ? activePaint : textPaint);
-                canvas.DrawText(row.Count.ToString(), width - Padding, baseline, SKTextAlign.Right, font, countPaint);
+                string countText = _totals.TryGetValue(row.Id, out int total) && total >= row.Count
+                    ? $"{row.Count}/{total}"   // shown / all known images on disk
+                    : row.Count.ToString();
+                canvas.DrawText(countText, width - Padding, baseline, SKTextAlign.Right, font, countPaint);
             }
 
             canvas.Restore();
+        }
+
+        /// <summary>Folder path for a local folder row, or null for other sources and the source root.</summary>
+        static string LocalPath(string id)
+        {
+            int slash = id.IndexOf('/');
+            if (slash <= 0 || !int.TryParse(id.AsSpan(0, slash), out int sourceId) || sourceId != 0)
+                return null;
+            var path = id[(slash + 1)..];
+            return string.IsNullOrWhiteSpace(path) ? null : path;
+        }
+
+        /// <summary>Counts every file with a known image extension in each folder, including subfolders.</summary>
+        static Dictionary<string, int> CountImageFiles(List<(string Id, string Dir)> dirs)
+        {
+            var result = new Dictionary<string, int>();
+            foreach (var item in dirs)
+            {
+                int count = -1; // stays -1 if the folder cannot be read
+                try
+                {
+                    count = 0;
+                    if (Directory.Exists(item.Dir))
+                        foreach (var file in Directory.EnumerateFiles(item.Dir, "*", SearchOption.AllDirectories))
+                            if (ImageLoader.KnownEndings.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                                count++;
+                }
+                catch (Exception) { }
+                result[item.Id] = count;
+            }
+            return result;
         }
 
         float MaxScroll(int clientHeight) => Math.Max(0, _rows.Count * RowHeight - (clientHeight - HeaderHeight));

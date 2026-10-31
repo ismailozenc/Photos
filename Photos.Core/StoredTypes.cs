@@ -339,6 +339,9 @@ namespace Photos.Core.StoredTypes
         public int ThumbnailDrawSize;
         [Key("sm")]
         public SortModeEnum StoredSortMode;
+        /// <summary>Set once the default folder sort has been applied to this library.</summary>
+        [Key("fsd")]
+        public bool FolderSortApplied;
         [Key("di")]
         public string[] Dirs;
         [Key("fi2")]

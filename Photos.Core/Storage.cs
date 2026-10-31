@@ -180,6 +180,8 @@ namespace Photos.Core
                     ThumbnailDrawSize = PhotoProvider.MediumThumbnailSize,
                     Dirs = new string[0],
                 };
+            if (!settings.FolderSortApplied)
+                settings = settings with { StoredSortMode = SortModeEnum.Filename, FolderSortApplied = true };
         }
 
         bool _initFinished;
