@@ -22,6 +22,9 @@ namespace Photos.Desktop
 
         public bool IsRunning => _windows.Count > 0;
 
+        /// <summary>Raised when the last slideshow window closes on its own (not via Stop).</summary>
+        public event Action Finished;
+
         public void Start()
         {
             if (IsRunning)
@@ -79,6 +82,7 @@ namespace Photos.Desktop
         /// <summary>Draws every slideshow window. Called once per frame of the main window.</summary>
         public void Tick()
         {
+            bool hadWindows = _windows.Count > 0;
             for (int i = _windows.Count - 1; i >= 0; i--)
             {
                 var window = _windows[i];
@@ -103,6 +107,8 @@ namespace Photos.Desktop
             }
 
             _restoreMainContext();
+            if (hadWindows && _windows.Count == 0)
+                Finished?.Invoke();
         }
     }
 }

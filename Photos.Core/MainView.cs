@@ -21,6 +21,7 @@ namespace Photos.Core
         readonly MessageBox _mbox;
         public MessageBox MessageBox => _mbox;
         public Menu MainMenu => mainMenu;
+        public event Action SlideshowRequested;
 
         public readonly Val<float> MenuButtonSize = new(-1);
         public readonly Val<float> ButtonSize = new(-1);
@@ -109,6 +110,14 @@ namespace Photos.Core
                 Link = Attach(() => SKRect.Create(InnerRect.Right - BigButtonSize, (WindowControlPanel.Enabled ? WindowControlPanel.Position.Bottom : InnerRect.Top) + ButtonPadding,
                     BigButtonSize, (BigButtonSize + ButtonPadding) * 4 - ButtonPadding)),
                 Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled },
+            };
+
+            new Button() // slideshow on all screens, browse mode only
+            {
+                Link = Attach(() => SKRect.Create(InnerRect.Left + ButtonPadding, InnerRect.Bottom - BigButtonSize - ButtonPadding, BigButtonSize, BigButtonSize)),
+                Icon = { Const = IconStore.Play },
+                OnClick = () => SlideshowRequested?.Invoke(),
+                Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled && photoProvider.DisplayedCount > 0 }
             };
 
             new Button() // clear selection
@@ -351,6 +360,11 @@ namespace Photos.Core
             {
                 e.Consume();
                 GoBack();
+            }
+            else if (e.Key == libKeys.S && ThumbnailView.Enabled && !photoProvider.IsInitRunning && photoProvider.DisplayedCount > 0)
+            {
+                e.Consume();
+                SlideshowRequested?.Invoke();
             }
         }
 

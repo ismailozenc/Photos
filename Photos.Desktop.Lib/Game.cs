@@ -33,6 +33,7 @@ namespace Photos.Desktop
         SlideshowController _slideshows;
         MonitorLayout _monitors;
         bool _monitorsAutoStart = true;
+        bool _layoutWasRunning;
         SKSurface skSurface;
 
         PhotoProvider photoProvider;
@@ -113,6 +114,15 @@ namespace Photos.Desktop
             photoProvider = providerPromise.Result;
             _slideshows = new SlideshowController(photoProvider, () => Context.MakeCurrent());
             _monitors = new MonitorLayout(photoProvider, () => Context.MakeCurrent());
+            _slideshows.Finished += () =>
+            {
+                if (_layoutWasRunning)
+                {
+                    _layoutWasRunning = false;
+                    _monitors.Start();
+                }
+            };
+            photoProvider.PhotoSelected += () => _monitors.ClosePreview();
             if (_monitors.Roles.Main is System.Drawing.Rectangle mainBounds)
                 MoveToDisplay(mainBounds);
 
@@ -170,6 +180,7 @@ namespace Photos.Desktop
             }
 
             var mainView = new MainView(photoProvider);
+            mainView.SlideshowRequested += StartSlideshowFromBrowse;
 
             new Button() // copy to clipboard
             {
@@ -223,23 +234,6 @@ namespace Photos.Desktop
 
             if (transparentBackground)
                 mainView.BackgroundColor = () => photoProvider.DB.Settings.IsOpaqueBackground ? SKColors.Black : SKColors.Black.WithAlpha(0xD0);
-
-            mainView.OnBuildPlatformSpecifiMenu += (kind, menu) =>
-            {
-                if (kind == MenuSection.Main)
-                    menu.Items.Add(new()
-                    {
-                        Text = _slideshows.IsRunning ? "Stop slideshow on all screens" : "Slideshow on all screens",
-                        ReturnLevel = Menu.CloseMenuLevel,
-                        OnClick = () =>
-                        {
-                            if (_slideshows.IsRunning)
-                                _slideshows.Stop();
-                            else
-                                _slideshows.Start();
-                        }
-                    });
-            };
 
             mainView.OnBuildPlatformSpecifiMenu += (kind, menu) =>
             {
@@ -386,6 +380,22 @@ namespace Photos.Desktop
 
             IsViewValid = false;
         }
+        /// <summary>Starts the all-screens slideshow. The monitor layout closes for the slideshow and comes back after it.</summary>
+        void StartSlideshowFromBrowse()
+        {
+            if (_slideshows.IsRunning)
+                return;
+
+            _layoutWasRunning = _monitors.IsRunning;
+            _monitors.Stop();
+            _slideshows.Start();
+            if (!_slideshows.IsRunning && _layoutWasRunning)
+            {
+                _layoutWasRunning = false;
+                _monitors.Start();
+            }
+        }
+
         void MoveToDisplay(System.Drawing.Rectangle bounds)
         {
             if (WindowState == WindowState.Maximized)

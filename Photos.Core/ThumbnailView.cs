@@ -132,9 +132,14 @@ namespace Photos.Core
                 },
                 OnClick = () =>
                 {
+                    // One click selects the photo for the preview; a second click on the same photo opens it.
                     var imgIndex = photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex;
+                    bool isDoubleClick = imgIndex == _lastClickIdx && (DateTime.UtcNow - _lastClickUtc).TotalMilliseconds < DoubleClickMs;
+                    _lastClickIdx = isDoubleClick ? -1 : imgIndex;
+                    _lastClickUtc = DateTime.UtcNow;
                     photoProvider.Idx = imgIndex;
-                    photoProvider.SelectPhoto();
+                    if (isDoubleClick)
+                        photoProvider.SelectPhoto();
                 },
                 OnAltClick = () =>
                 {
@@ -168,6 +173,9 @@ namespace Photos.Core
             _dateTimeFormat = CultureInfo.CurrentCulture.DateTimeFormat.LongDatePattern;
             _dateTimeFormat = _dateTimeFormat.Replace("dddd", "").Replace("dddd", "").Trim(',').Trim();
         }
+        const int DoubleClickMs = 450;
+        int _lastClickIdx = -1;
+        DateTime _lastClickUtc;
         int minImgIdx, maxImgIdx;
         protected override void RouteRenderFrame(SKCanvas ctx)
         {

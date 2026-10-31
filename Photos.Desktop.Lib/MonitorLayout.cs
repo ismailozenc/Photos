@@ -56,6 +56,14 @@ namespace Photos.Desktop
             }
         }
 
+        /// <summary>Closes the preview only, for example after a photo is opened in the main window.</summary>
+        public void ClosePreview()
+        {
+            foreach (var window in _windows)
+                if (window is PreviewWindow)
+                    window.Close(); // removed and disposed on the next Tick
+        }
+
         public void Stop()
         {
             if (_windows.Count == 0)
