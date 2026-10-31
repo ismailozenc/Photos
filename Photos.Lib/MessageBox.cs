@@ -52,6 +52,9 @@ namespace Photos.Lib
 
         public void Show(string[] text, params MessageBoxButton[] options)
         {
+            if (NativeDialogs.Show?.Invoke(text, options) == true)
+                return;
+
             _textPanel.RemoveChildren(x => true);
             _buttonPanel.RemoveChildren(x => true);
 

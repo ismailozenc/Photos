@@ -105,6 +105,9 @@ namespace Photos.Desktop
             base.OnLoad();
 
             DesktopImageLoader.Register();
+#if WINFORMS
+            WinFormsDialogs.Register();
+#endif
             photoProvider = providerPromise.Result;
 
             bool transparentBackground = false;
