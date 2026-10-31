@@ -936,13 +936,9 @@ namespace Photos.Core
             }
 
             var entries = new List<MenuItem>();
-            for (int i = 0; i < file.Src.Length; i++)
+            foreach (var index in photoProvider.ActionableSources(file))
             {
-                var index = i;
-                var dir = photoProvider.DB.Directories.GetValue(file.Src[i].D);
-                var fullPath = file.Src[i].GetFullPath(photoProvider);
-                if (!dir.IsLocal() || !File.Exists(fullPath.osPath))
-                    continue;
+                var fullPath = file.Src[index].GetFullPath(photoProvider);
 
                 if (photoProvider.ShowDeleted)
                     entries.Add(new MenuItem()

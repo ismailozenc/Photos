@@ -1,4 +1,7 @@
 ﻿using System;
+using SkiaSharp;
+using System.Diagnostics;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -95,24 +98,148 @@ namespace Photos.Core
                 MainToast.Show("Wrong password");
         }
 
-        /// <summary>Right-click menu for a thumbnail in browse mode.</summary>
+        /// <summary>Right-click menu for thumbnails in browse mode. It works on the selection when the photo is selected.</summary>
         void ShowItemMenu(int idx)
         {
-            var file = photoProvider.GetFile(idx);
-            if (file == null || !file.IsIndexed())
+            var clicked = photoProvider.GetFile(idx);
+            if (clicked == null || !clicked.IsIndexed())
                 return;
 
-            mainMenu.Show(m =>
+            var indexes = ThumbnailView.SelectedItems.Contains(idx) ? ThumbnailView.SelectedItems.OrderBy(x => x).ToList() : new List<int> { idx };
+            var files = indexes.Select(i => photoProvider.GetFile(i)).Where(f => f != null && f.IsIndexed()).ToList();
+            var items = new List<MenuItem>();
+
+            if (files.Count == 1)
             {
-                m.Title = "Image";
-                m.Items.Add(new MenuItem() { Text = "Info", Submenu = x => _photoView.BuildImageInfo(x, file) });
-                m.Items.Add(new MenuItem()
+                var file = files[0];
+                items.Add(new MenuItem() { Text = "Info", Submenu = x => _photoView.BuildImageInfo(x, file) });
+
+                var lat = FileRecord.LoadDegree(file.GetOptional(OptionalKeys.Lat));
+                var lon = FileRecord.LoadDegree(file.GetOptional(OptionalKeys.Lon));
+                if (lat != 0 && lon != 0)
+                    items.Add(new MenuItem()
+                    {
+                        Text = "Show on map",
+                        OnClick = () => Window.OpenUrl(FormattableString.Invariant($"geo:{lat},{lon}")),
+                        ReturnLevel = Menu.CloseMenuLevel,
+                    });
+
+                if (OperatingSystem.IsWindows())
+                    foreach (var src in file.Src)
+                    {
+                        var dir = photoProvider.DB.Directories.GetValue(src.D);
+                        var path = src.GetFullPath(photoProvider);
+                        if (!dir.IsLocal() || !File.Exists(path.osPath))
+                            continue;
+                        var osPath = path.osPath;
+                        items.Add(new MenuItem()
+                        {
+                            Text = $"Show in Explorer: {path.display}",
+                            OnClick = () => Process.Start("explorer.exe", "/select, \"" + osPath + "\""),
+                            ReturnLevel = Menu.CloseMenuLevel,
+                        });
+                    }
+            }
+
+            bool allFavorite = files.All(f => photoProvider.DB.GetAdditionalImageData(f).IsFavorite);
+            string favoriteText = files.Count == 1
+                ? (allFavorite ? "Remove from favorites" : "Add to favorites")
+                : (allFavorite ? $"Remove {files.Count} from favorites" : $"Add {files.Count} to favorites");
+            items.Add(new MenuItem()
+            {
+                Text = favoriteText,
+                OnClick = () => { foreach (var f in files) SetFavorite(f, !allFavorite); },
+                ReturnLevel = Menu.CloseMenuLevel,
+            });
+
+            AddDeleteItems(items, files);
+            ShowItemMenuAt(items, files.Count);
+        }
+
+        void SetFavorite(FileRecord file, bool isFavorite)
+        {
+            var dat = photoProvider.DB.GetAdditionalImageData(file);
+            dat.IsFavorite = isFavorite;
+            photoProvider.DB.SetAdditionalImageData(file, dat);
+        }
+
+        /// <summary>Delete, or restore in the deleted view. Every copy is included, and no confirmation is asked.</summary>
+        void AddDeleteItems(List<MenuItem> items, List<FileRecord> files)
+        {
+            var restoring = photoProvider.ShowDeleted;
+            int copies = files.Sum(f => photoProvider.ActionableSources(f).Count());
+            if (copies == 0)
+                return;
+
+            string verb = restoring ? "Restore" : "Delete";
+            string text = files.Count == 1
+                ? (copies > 1 ? $"{verb} all copies" : verb)
+                : $"{verb} {files.Count} images";
+            items.Add(new MenuItem()
+            {
+                Text = text,
+                OnClick = () => RunOnCopies(files, restoring),
+                ReturnLevel = Menu.CloseMenuLevel,
+            });
+
+            if (files.Count == 1 && copies > 1)
+            {
+                var single = files[0];
+                var copyEntries = photoProvider.ActionableSources(single).Select(i => new MenuItem()
                 {
-                    Text = photoProvider.DB.GetAdditionalImageData(file).IsFavorite ? "Remove from favorites" : "Add to favorites",
-                    OnClick = () => _photoView.ToggleFavorite(file),
+                    Text = $"{verb} {single.Src[i].GetFullPath(photoProvider).display}",
+                    OnClick = () => RunFileAction(
+                        () => restoring ? photoProvider.RestoreFromDeleted(single, i) : photoProvider.MoveToDeleted(single, i),
+                        restoring ? "Restored" : "Moved to deleted images"),
                     ReturnLevel = Menu.CloseMenuLevel,
-                });
-                AddDeleteEntries(m, file);
+                }).ToList();
+                items.Add(new MenuItem() { Text = $"{verb} a copy", Submenu = s => s.Items.AddRange(copyEntries) });
+            }
+        }
+
+        void RunOnCopies(List<FileRecord> files, bool restoring)
+        {
+            int done = 0, failed = 0;
+            string lastError = null;
+            foreach (var file in files)
+                foreach (var index in photoProvider.ActionableSources(file).ToList())
+                {
+                    var error = restoring
+                        ? photoProvider.RestoreFromDeleted(file, index, refresh: false)
+                        : photoProvider.MoveToDeleted(file, index, refresh: false);
+                    if (error == null)
+                        done++;
+                    else
+                    {
+                        failed++;
+                        lastError = error;
+                    }
+                }
+
+            photoProvider.EnqueueRefreshDisplayOrder();
+            string success = restoring ? "Restored" : "Moved to deleted images";
+            MainToast.Show(failed == 0 ? $"{success}: {done}" : $"{done} done, {failed} failed: {lastError}");
+        }
+
+        void RunFileAction(Func<string> action, string successText)
+        {
+            var error = action();
+            MainToast.Show(error == null ? successText : $"Failed: {error}");
+        }
+
+        /// <summary>Opens the menu next to the pointer, kept inside the window.</summary>
+        void ShowItemMenuAt(List<MenuItem> items, int count)
+        {
+            var pointer = Window.MousePosition() ?? new SKPoint(Size.Width / 2, Size.Height / 2);
+            const float width = 240, rowHeight = 40, padding = 8;
+            float height = items.Count * rowHeight + padding * 2;
+            float x = Math.Clamp(pointer.X + 8, 4, Size.Width - width - 4);
+            float y = Math.Clamp(pointer.Y + 8, 4, Size.Height - height - 4);
+            _itemMenuRect = SKRect.Create(x, y, width, height);
+            _itemMenu.Show(m =>
+            {
+                m.Title = count == 1 ? "Image" : $"{count} images selected";
+                m.Items.AddRange(items);
             });
         }
 

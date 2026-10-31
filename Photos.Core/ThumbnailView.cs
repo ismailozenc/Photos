@@ -28,6 +28,7 @@ namespace Photos.Core
         public readonly ScrollContainer ScrollContainer;
 
         FileRecord lastShownFile;
+        public readonly HashSet<int> SelectedItems = new();
         Replicator imgReplicator, groupReplicator;
 
         public ThumbnailView(PhotoProvider photoProvider, Val<float> buttonSize)
@@ -129,6 +130,12 @@ namespace Photos.Core
                 {
                     // One click selects the photo for the preview; a second click on the same photo opens it.
                     var imgIndex = photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex;
+                    if (Window.IsCtrlDown())
+                    {
+                        if (!SelectedItems.Remove(imgIndex))
+                            SelectedItems.Add(imgIndex);
+                        return;
+                    }
                     bool isDoubleClick = imgIndex == _lastClickIdx && (DateTime.UtcNow - _lastClickUtc).TotalMilliseconds < DoubleClickMs;
                     _lastClickIdx = isDoubleClick ? -1 : imgIndex;
                     _lastClickUtc = DateTime.UtcNow;
@@ -137,6 +144,7 @@ namespace Photos.Core
                         photoProvider.SelectPhoto();
                 },
                 OnContext = () => ItemContextRequested?.Invoke(photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex),
+                IsHighlighted = { Func = () => SelectedItems.Contains(photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex) },
             };
 
             ScrollContainer.ScrollPositionHint = () =>

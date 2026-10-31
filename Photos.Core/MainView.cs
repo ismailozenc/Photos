@@ -17,6 +17,8 @@ namespace Photos.Core
         ThumbnailSizeSlider _sizeSlider;
         public readonly ThumbnailView ThumbnailView;
         Menu mainMenu;
+        readonly Menu _itemMenu;
+        SKRect _itemMenuRect;
         public readonly Toast MainToast;
         readonly MessageBox _mbox;
         public MessageBox MessageBox => _mbox;
@@ -178,6 +180,13 @@ namespace Photos.Core
                 ButtonSize = { Func = () => MenuButtonSize }
             };
 
+            _itemMenu = new Menu()
+            {
+                Link = Attach(() => OuterRect),
+                DialogRect = () => _itemMenuRect,
+                ButtonSize = { Func = () => MenuButtonSize }
+            };
+
             _photoView.MainMenu = mainMenu;
             ThumbnailView.ItemContextRequested += ShowItemMenu;
 
@@ -267,6 +276,7 @@ namespace Photos.Core
 
             photoProvider.OnDisplayOrderUpdate += () => Window.Run(() =>
             {
+                ThumbnailView.SelectedItems.Clear();
                 Window.Invalidate();
             });
 

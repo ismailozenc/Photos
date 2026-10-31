@@ -310,11 +310,11 @@ namespace Photos.Core
                 var files = GetLibraryFiles(out var dirs);
                 TotalCount = files.Count;
 
-                FilterService.IsHidden = f => IsPrivateHidden(f) || IsTrashed(f);
+                FilterService.IsHidden = f => IsPrivateHidden(f) || IsFullyTrashed(f);
                 if (!skipFilters)
                     FilterService.RefreshFilters(files, dirs.Where(x => x != null), initTask != null);
 
-                files = files.Where(f => !IsPrivateHidden(f) && IsTrashed(f) == ShowDeleted).ToList(); // private folders and the open view
+                files = files.Where(f => !IsPrivateHidden(f) && (ShowDeleted ? HasTrashedSource(f) : !IsFullyTrashed(f))).ToList(); // private folders and the open view
                 FilterService.FilterFiles(files);
 
                 if (FilterService.CurrentSortMode == SortModeEnum.Filename)
@@ -415,16 +415,34 @@ namespace Photos.Core
         public IEnumerable<string> TrashFolderIds => DeletedMap.Keys
             .Select(p => System.IO.Path.GetDirectoryName(p)).Where(d => d != null).Distinct().Select(d => "0/" + d);
 
-        /// <summary>True for a photo that was moved to a deleted-images folder.</summary>
-        public bool IsTrashed(FileRecord file)
+        /// <summary>True when this copy was moved to a deleted-images folder.</summary>
+        public bool IsTrashedSource(SourceRecord s)
         {
             var map = DeletedMap;
-            return map.Count > 0 && file.Src.Any(s => map.ContainsKey(DB.Directories.GetValue(s.D).CombinePath(s).ToLowerInvariant()));
+            return map.Count > 0 && map.ContainsKey(DB.Directories.GetValue(s.D).CombinePath(s).ToLowerInvariant());
+        }
+
+        /// <summary>A photo is hidden from the library only when every copy is in the deleted-images folder.</summary>
+        public bool IsFullyTrashed(FileRecord file) => file.Src.All(IsTrashedSource);
+
+        /// <summary>True when at least one copy is in the deleted-images folder.</summary>
+        public bool HasTrashedSource(FileRecord file) => file.Src.Any(IsTrashedSource);
+
+        /// <summary>Indexes of the copies the current view can act on: local copies that are trashed in the deleted view, and not trashed otherwise.</summary>
+        public IEnumerable<int> ActionableSources(FileRecord file)
+        {
+            for (int i = 0; i < file.Src.Length; i++)
+            {
+                var dir = DB.Directories.GetValue(file.Src[i].D);
+                if (dir.IsLocal() && IsTrashedSource(file.Src[i]) == ShowDeleted && File.Exists(dir.CombinePath(file.Src[i])))
+                    yield return i;
+            }
         }
 
         /// <summary>Moves a local photo into its library's deleted-images folder. Nothing is overwritten.</summary>
-        public string MoveToDeleted(FileRecord file, int srcIndex)
+        public string MoveToDeleted(FileRecord file, int srcIndex, bool refresh = true)
         {
+            file = DB.Current(file);
             var src = file.Src[srcIndex];
             var dir = DB.Directories.GetValue(src.D);
             var fullPath = dir.CombinePath(src);
@@ -451,13 +469,15 @@ namespace Photos.Core
             if (IsSingleFolderMode)
                 lock (_lock)
                     _folderViewList = _folderViewList.Where(x => x != file).ToList();
-            EnqueueRefreshDisplayOrder();
+            if (refresh)
+                EnqueueRefreshDisplayOrder();
             return null;
         }
 
         /// <summary>Moves a deleted photo back to the folder it came from. A name clash gets a new name.</summary>
-        public string RestoreFromDeleted(FileRecord file, int srcIndex)
+        public string RestoreFromDeleted(FileRecord file, int srcIndex, bool refresh = true)
         {
+            file = DB.Current(file);
             var src = file.Src[srcIndex];
             var trashed = DB.Directories.GetValue(src.D).CombinePath(src);
             if (!DeletedMap.TryGetValue(trashed.ToLowerInvariant(), out var original))
@@ -480,7 +500,8 @@ namespace Photos.Core
             DB.Settings = DB.Settings with { DeletedOriginals = (DB.Settings.DeletedOriginals ?? Array.Empty<string>())
                 .Where(x => !x.StartsWith(trashed + "|", StringComparison.OrdinalIgnoreCase)).ToArray() };
             _deletedMap = null;
-            EnqueueRefreshDisplayOrder();
+            if (refresh)
+                EnqueueRefreshDisplayOrder();
             return null;
         }
 

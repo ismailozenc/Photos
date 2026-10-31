@@ -155,6 +155,7 @@ namespace Photos.Desktop
                     return null;
                 },
                 MousePosition = () => MousePosition.ToSK(),
+                IsCtrlDown = () => IsKeyDown(Keys.LeftControl) || IsKeyDown(Keys.RightControl),
                 IsBorderless = () => WindowBorder == WindowBorder.Hidden,
                 GR = skiaCtx,
                 MaxRenderTargetSize = Math.Min(GL.GetInteger(GetPName.MaxTextureSize), GL.GetInteger(GetPName.MaxRenderbufferSize)),

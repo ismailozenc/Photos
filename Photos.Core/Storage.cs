@@ -152,12 +152,21 @@ namespace Photos.Core
         }
 
         /// <summary>Points one source of a file at another directory and file name, e.g. after a move.</summary>
+        /// <summary>The stored record for this file. Records are replaced when they change, so callers can hold an old one.</summary>
+        public FileRecord Current(FileRecord file)
+        {
+            lock (_files)
+                return _files.TryGetValue(file.Sig, out var current) ? current : file;
+        }
+
+        /// <summary>Points one source of a file at another directory and file name, e.g. after a move.</summary>
         internal void ReplaceSource(FileRecord file, int srcIndex, int dirIdx, string fileName)
         {
-            var src = (SourceRecord[])file.Src.Clone();
+            var current = Current(file);
+            var src = (SourceRecord[])current.Src.Clone();
             src[srcIndex] = src[srcIndex] with { D = dirIdx, FN = fileName };
             lock (_files)
-                UpdateInternal(FileRecord.Clone(file, src), file);
+                UpdateInternal(FileRecord.Clone(current, src), current);
             IsDirty = true;
             SaveFiles();
         }
