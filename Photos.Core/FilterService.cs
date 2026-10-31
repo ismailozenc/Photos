@@ -197,9 +197,6 @@ namespace Photos.Core
                         SrcFilter = true,
                         AlphaSorter = x => x.OrderBy(f => f.PreText).ThenBy(f => f.Text) 
                     },
-                    new FileFilterGroup() { GroupId = "camera model", SortOrder = 30, FilterList = GetStringFilter(x => x.GetOptional(OptionalKeys.CameraModel)), SortByAlpha = false },
-                    new FileFilterGroup() { GroupId = "city", SortOrder = 40, FilterList = GetStringFilter(x=>x.GetOptional(OptionalKeys.City)), SortByAlpha = false },
-                    new FileFilterGroup() { GroupId = "country", SortOrder = 40, FilterList = GetStringFilter(x=>x.GetOptional(OptionalKeys.Country)), SortByAlpha = false },
                 }.ToList();
 
                 foreach (var item in res)
@@ -250,14 +247,6 @@ namespace Photos.Core
                     ActiveSettings = setting;
             }
 
-            List<FileFilter> GetStringFilter(Func<FileRecord, int> stringSelector) => files.Select(stringSelector).GroupBy(x => x)
-                                   .Select(x => new FileFilter()
-                                   {
-                                       Id = x.Key.ToString(),
-                                       Text = DB.Strings.GetValue(x.Key) ?? "<unknown>",
-                                       Filter = f => stringSelector(f) == x.Key,
-                                       Count = x.Count()
-                                   }).ToList();
         }
        
         public void ToggleFilters(FileFilterGroup gr, params FileFilter[] filters)
