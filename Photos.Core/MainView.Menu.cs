@@ -177,6 +177,18 @@ namespace Photos.Core
             }));
         }
 
+        void ShowFilterMenu(FileFilterGroup[] filterGroups)
+        {
+            mainMenu.Show(menu =>
+            {
+                menu.Title = "Filter";
+
+                photoProvider.FilterService.ActiveFiltersMenu(menu);
+
+                menu.Items.AddRange(filterGroups.Select(x => photoProvider.FilterService.ToMenuItem(x)));
+            });
+        }
+
         void PhotoLibMenu(MenuDef menu)
         {
             if (photoProvider.FolderLibraryMode)
