@@ -27,7 +27,6 @@ namespace Photos.Desktop
         SKImage _image;
         int _index;
         bool _paused;
-        bool _dirty = true;
 
         public SlideshowWindow(PhotoProvider provider, int x, int y, int width, int height, int startIndex)
             : base(GameWindowSettings.Default, new NativeWindowSettings
@@ -75,7 +74,6 @@ namespace Photos.Desktop
 
             // Present every tick: the OS can discard a window's contents, which would leave it
             // blank until the next photo change.
-            _dirty = false;
             Draw();
             _skiaCtx.Flush();
             SwapBuffers();
@@ -90,7 +88,6 @@ namespace Photos.Desktop
             _index = ((_index + direction) % count + count) % count;
             _timer.Restart();
             LoadCurrent();
-            _dirty = true;
         }
 
         void LoadCurrent()
@@ -145,7 +142,6 @@ namespace Photos.Desktop
                 throw new InvalidOperationException("Skia surface could not be created");
 
             _surfaceSize = size;
-            _dirty = true;
         }
 
         void HandleKeyDown(KeyboardKeyEventArgs e)

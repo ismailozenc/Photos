@@ -276,12 +276,6 @@ namespace Photos.Core
                 });
         }
 
-        void RunFileAction(Func<string> action, string successText)
-        {
-            var error = action();
-            MainToast.Show(error == null ? successText : $"Failed: {error}");
-        }
-
         void ShowDebugMenu(MenuDef menu)
         {
             var debug = new List<MenuItem>
