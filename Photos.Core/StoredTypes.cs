@@ -333,8 +333,6 @@ namespace Photos.Core.StoredTypes
     [MessagePackObject(AllowPrivate = true)]
     public sealed record class SettingsRecord
     {
-        [Key("ts")]
-        public int ThumbnailSize;
         [Key("da")]
         public byte[] Data;
         [Key("tds")]
@@ -347,14 +345,8 @@ namespace Photos.Core.StoredTypes
         public IReadOnlyDictionary<string, StoredFilterInfo> Filters = new Dictionary<string, StoredFilterInfo>();
         [Key("dev")]
         public bool DevMode;
-        [Key("ct")]
-        public long CreationTimeUtc;
-        [Key("err")]
-        public bool ErrorOptOut;
         [Key("obg")]
         public bool IsOpaqueBackground;
-        [Key("notif")]
-        public bool UpdatesNotificationOptOut;
 
         /// <summary>Ranking of the library by head-to-head choices (see RankingEngine).</summary>
         [Key("rk")]

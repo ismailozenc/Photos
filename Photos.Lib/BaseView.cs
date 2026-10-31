@@ -26,15 +26,6 @@ namespace Photos.Lib
         //public static implicit operator float(PaddingDef v) => v.Top;
         public static implicit operator PaddingDef(float v) => new (v, v, v, v);
 
-        public PaddingDef Expand(float h, float v)
-        {
-            var r = this;
-            r.Left += h;
-            r.Top += v;
-            r.Right += h;
-            r.Bottom += v;
-            return r;
-        }
     }
 
     public class BaseView : IDisposable

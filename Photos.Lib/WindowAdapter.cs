@@ -116,16 +116,6 @@ namespace Photos.Lib
 
         }
 
-        public Task<SKImage> GetScreenshot()
-        {
-            lock (_lock)
-            {
-                var res = new TaskCompletionSource<SKImage>();
-                _screenshots.Add(res);
-                return res.Task;
-            }
-        }
-
         public event Action<DateTime> RenderFinished;
 
         public string GetRenderStats()

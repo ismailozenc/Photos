@@ -49,8 +49,6 @@ namespace Photos.Lib
         public Val(T c) { _const = c; }
         public Val(Func<T> func) { Func = func; }
 
-        public void CheckOnChange() => _ = Value;
-
         public void Adjust(Func<T, T> f)
         {
             var lastFunc = Func;

@@ -39,13 +39,6 @@ namespace Photos.Core
             OnBuildPlatformSpecifiMenu?.Invoke(MenuSection.Main, menu);
             menu.Items.Add(new() { Text = "Settings", Submenu = SettingsMenu });
 
-            menu.Items.Add(new() { Text = "About" });
-            menu.Items.Add(new()
-            {
-                Text = $"About {Utils.AppName}",
-                Submenu = ShowAbout
-            });
-
              if (photoProvider.DB.Settings.DevMode)
                 menu.Items.Add(new()
                 {
@@ -69,38 +62,9 @@ namespace Photos.Core
 
             menu.Items.Add(new()
             {
-                Text = $"Automated error reports: {(photoProvider.DB.Settings.ErrorOptOut ? "disabled" : "enabled")}",
-                OnClick = () =>
-                {
-                    photoProvider.DB.Settings = photoProvider.DB.Settings with { ErrorOptOut = !photoProvider.DB.Settings.ErrorOptOut };
-                }
+                Text = $"Debug mode: {(photoProvider.DB.Settings.DevMode ? "ON" : "OFF")}",
+                OnClick = () => photoProvider.DB.Settings = photoProvider.DB.Settings with { DevMode = !photoProvider.DB.Settings.DevMode }
             });
-
-            menu.Items.Add(new()
-            {
-                Text = $"Update notifications: {(photoProvider.DB.Settings.UpdatesNotificationOptOut ? "disabled" : "enabled")}",
-                OnClick = () =>
-                {
-                    photoProvider.DB.Settings = photoProvider.DB.Settings with
-                        { UpdatesNotificationOptOut = !photoProvider.DB.Settings.UpdatesNotificationOptOut };
-                }
-            });
-
-        }
-
-        int _devMenuCntr;
-        MenuItem _devMenuItem;
-        private void MainMenu_SectionClick(MenuItem obj)
-        {
-            if (obj == _devMenuItem)
-            {
-                _devMenuCntr++;
-                if (_devMenuCntr > 6)
-                {
-                    photoProvider.DB.Settings = photoProvider.DB.Settings with { DevMode = !photoProvider.DB.Settings.DevMode };
-                    mainMenu.Close();
-                }
-            }
         }
 
         void ShowDebugMenu(MenuDef menu)
@@ -131,12 +95,6 @@ namespace Photos.Core
                             File.Delete(Utils.LogFile);
                     }
                 },
-                new()
-                {
-                    Text = $"Debug mode: {(photoProvider.DB.Settings.DevMode ? "ON" : "OFF")}",
-                    OnClick = () => photoProvider.DB.Settings = photoProvider.DB.Settings with { DevMode = !photoProvider.DB.Settings.DevMode },
-                    ReturnLevel = menu.Parent
-                },
                 new () { Text = "Throw", OnClick = () => throw new Exception("test") },
                 new () { Text = "mbox", OnClick = () => _mbox.Show(new [] { "test", "test test asdfa asdf asdf test asdfa asdf asdf test asdfa asdf asdf test asdfa", "test asdfa asdf asdf" }, new MessageBoxButton() { Text= "close" }, new MessageBoxButton() { Text= "close" } ) },
                 new () { Text = "Toast", OnClick = () => MainToast.Show("test test test!!!") },
@@ -147,24 +105,6 @@ namespace Photos.Core
                 item.TextAlign = SkiaSharp.SKTextAlign.Left;
 
             menu.Items.AddRange(debug);
-        }
-
-        public string LicenseUrl = "https://www.bytificial.com/uphoto_license_mit";
-
-        void ShowAbout(MenuDef menu)
-        {
-            var about = new List<MenuItem>
-                {
-                    new MenuItem() {Text = $"{Utils.AppName} v{Version}" },
-                    new MenuItem() {Text = Copyright, TextScale = 0.6f },
-                    new MenuItem() {Text = "License", OnClick = () => Window.OpenUrl(LicenseUrl) },
-                    new MenuItem() {Text = "Privacy policy", OnClick = () => Window.OpenUrl("https://www.bytificial.com/privacy") },
-                    new MenuItem() {Text = "Website", OnClick = () => Window.OpenUrl("https://www.bytificial.com/uPhotos") },
-                };
-
-            _devMenuItem = about[0];
-            _devMenuCntr = 0;
-            menu.Items.AddRange(about);
         }
 
         private void ShowThumbnailDisplaySizeMenu(MenuDef menu)

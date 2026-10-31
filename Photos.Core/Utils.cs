@@ -5,10 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http.Json;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Photos.Core
@@ -19,15 +16,12 @@ namespace Photos.Core
         public const string LatinAppName = "uPhotos";
 
         public static Func<bool> TraceEnabled;
-        public static Func<bool> ErrorReportOptOut;
 
         static Utils()
         {
             AppDomain.CurrentDomain.UnhandledException += (s, e) => LogError((Exception)e.ExceptionObject);
             TaskScheduler.UnobservedTaskException += (s, e) => LogError(e.Exception);
         }
-
-        private static readonly HttpClient HttpClient = new();
 
         public static async Task WaitWhile(Func<bool> cond)
         {
@@ -47,21 +41,9 @@ namespace Photos.Core
             });
         }
 
-        static readonly byte[] buf = [104, 116, 116, 112, 115, 58, 47, 47, 99, 117, 98, 101, 119, 101, 97, 118, 101, 114, 46, 99, 111, 
-            109, 47, 97, 112, 112, 47, 95, 97, 112, 105, 47, 76, 111, 103]; // to prevent spam
         public static void LogError(Exception e)
         {
-            var txt = e?.ToString();
-            Log(txt);
-            if (ErrorReportOptOut?.Invoke() != true && !Debugger.IsAttached)
-            {
-                try
-                {
-                    var arg = new string[] { $"P_VER {MainView.Version}, {Environment.OSVersion}: {e?.Message}", txt, "true" };
-                    HttpClient.PostAsJsonAsync(Encoding.UTF8.GetString(buf), arg, MySerializerContext.Default.StringArray).ContinueWith(x => x.IsFaulted).Wait(2000);
-                }
-                catch (Exception ex) { Log($"report failed {ex}"); }
-            }
+            Log(e?.ToString());
         }
 
         public static void TraceError(Exception e)
@@ -177,11 +159,6 @@ namespace Photos.Core
         }
     }
 
-
-    [JsonSerializable(typeof(string[]))]
-    public partial class MySerializerContext : JsonSerializerContext
-    {
-    }
 
     public class PriorityScheduler : TaskScheduler
     {

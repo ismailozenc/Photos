@@ -130,34 +130,6 @@ namespace Photos.Core
             Sync(s, live, rnd);
         }
 
-        /// <summary>Moves a photo to the bottom of the ranking without comparing it.</summary>
-        public static void SendToBack(RankingState s, ulong sig, IEnumerable<ulong> live, Random rnd)
-        {
-            var liveList = live.Distinct().ToList();
-            if (!liveList.Contains(sig))
-                return;
-
-            if (s.HasInsertion && s.InsertionSig == sig)
-            {
-                s.HasInsertion = false;
-                s.Order.Add(sig);
-                Sync(s, liveList, rnd);
-                return;
-            }
-
-            // Removing a ranked photo shifts the positions after it, so the search window follows.
-            int removeAt = s.Order.IndexOf(sig);
-            if (s.HasInsertion && removeAt >= 0)
-            {
-                if (s.Lo > removeAt) s.Lo--;
-                if (s.Hi > removeAt) s.Hi--;
-            }
-
-            s.Order.RemoveAll(x => x == sig);
-            s.Order.Add(sig);
-            Sync(s, liveList, rnd);
-        }
-
         public static RankingProgress GetProgress(RankingState s, IEnumerable<ulong> live)
         {
             int total = live.Distinct().Count();

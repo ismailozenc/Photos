@@ -12,9 +12,6 @@ namespace Photos.Core
 {
     public partial class MainView : FreePanel
     {
-        public static string Version = typeof(MainView).Assembly.GetName().Version.ToString();
-        public static string Copyright = "Copyright (c) 2022-2026 Vadim Lapiner";
-
         PhotoView _photoView;
         CompareView _compareView;
         ThumbnailSizeSlider _sizeSlider;
@@ -195,7 +192,6 @@ namespace Photos.Core
                 ButtonSize = { Func = () => MenuButtonSize }
             };
 
-            mainMenu.SectionClick += MainMenu_SectionClick;
             _photoView.MainMenu = mainMenu;
 
             _sizeSlider = new ThumbnailSizeSlider()
@@ -323,34 +319,11 @@ namespace Photos.Core
 
                 ctx.Clear(BackgroundColor());
             };
-
-            UpdatesCheck();
         }
 
         public Func<SKColor> BackgroundColor = () => SKColors.Black;
 
         bool _limitSet;
-
-        async void UpdatesCheck()
-        {
-            if (Debugger.IsAttached)
-                return;
-
-            try
-            {
-                var thisVer = Version;
-                using var httpClient = new HttpClient();
-                var srvVer = await httpClient.GetStringAsync($"https://www.bytificial.com/version.txt?app_ver={thisVer}&db_ver={photoProvider.DB.Settings.CreationTimeUtc / 1000000}");
-                long toInt(string s) => s.Split(".").Select(long.Parse).Aggregate((x, y) => x * 1000 + y);
-
-                if (toInt(srvVer) > toInt(thisVer) && !photoProvider.DB.Settings.UpdatesNotificationOptOut)
-                    Window.Run(() => MainToast.Show($"A newer version of {Utils.AppName} is available", 5));
-            }
-            catch (Exception)
-            {
-                //Utils.LogError(e);
-            }
-        }
 
         bool EmptyLibrary => photoProvider.FolderLibraryMode && photoProvider.GetDirs().Count == 0 && photoProvider.TotalCount == 0;
 

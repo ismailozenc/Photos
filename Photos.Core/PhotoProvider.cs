@@ -23,7 +23,6 @@ namespace Photos.Core
     {
         public PhotoIndexer Indexer;
 
-        public const int LargeThumbnailSize = 536;
         public const int MediumThumbnailSize = 352;
 
         public FilterService FilterService { get; private set; }
@@ -105,7 +104,6 @@ namespace Photos.Core
             
             DB = new Storage(dbPath);
             Utils.TraceEnabled = () => DB.Settings.DevMode;
-            Utils.ErrorReportOptOut = () => DB.Settings.ErrorOptOut;
 
             DB.OnSettingsUpdate += SettingsUpdate;
             Indexer = new PhotoIndexer(DB, protectUnreadableFolders, Path.Combine(editorDir, Utils.LatinAppName));
@@ -300,31 +298,6 @@ namespace Photos.Core
 
             EnqueueRefreshDisplayOrder();
             RestartBackgroundTasks(null);
-        }
-
-        public void RemoveSrc(int id)
-        {
-            RestartBackgroundTasks(() =>
-            {
-                DB.RemoveSource(id);
-                DB.SaveFiles();
-                EnqueueRefreshDisplayOrder();
-            });
-
-        }
-
-        public void AddSrc(SyncSource src)
-        {
-            lock (_lock)
-            {
-                var id = DB.SyncSources.Select(x => x.Id).Concat(new[] { 0 }).Max() + 1;
-                src.Id = id;
-                DB.SyncSources = DB.SyncSources.AddToArr(src);
-                DB.IsDirty = true;
-            }
-
-            DB.SaveFilesIfDirty();
-            UpdateLibraryMaybe();
         }
 
         public Func<string, Task<string>> DeleteSourceFileImpl { private get; set; }
@@ -719,19 +692,6 @@ namespace Photos.Core
         }
 
         public Func<Task, Task> RequestUILock;
-
-        public void EnqueueInvalidateThumbnailCache()
-        {
-            SystemUpdates.Enqueue(new UpdateOp() 
-            {
-                UILockAction = () =>
-                    {
-                        _microCache.Clear();
-                        _scaledThumbnails.Clear();
-                        _fullSizeThumbnails.Clear();
-                    }
-            });
-        }
 
         internal void InvalidateThumbnail(FileRecord file)
         {

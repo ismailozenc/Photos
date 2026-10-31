@@ -62,7 +62,6 @@ namespace Photos.Lib
         TextLabel CommentLabel, PreTextLabel;
 
         public MenuDef ActiveMenu;
-        public event Action<MenuItem> SectionClick;
 
         public bool ShowHeader = true;
 
@@ -196,8 +195,6 @@ namespace Photos.Lib
             };
 
             SectionLabel.TextScale.Adjust(GetTextScale);
-
-            SectionLabel.MouseHandler = e => SectionLabel.DetectClick(e, () => SectionClick?.Invoke(CurItem));
 
             float GetTextScale(float x) => x * (ActiveMenu.LargeButtons ? 0.8f : 1f) * (CurItem.TextScale ?? 1f);
 

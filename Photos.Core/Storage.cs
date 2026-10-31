@@ -165,27 +165,6 @@ namespace Photos.Core
             SaveFiles();
         }
 
-        internal void RemoveSource(int srcId)
-        {
-            lock (_files)
-            {
-                var removedDirs = new HashSet<int>();
-                for (int i = 0; i < Directories.Length; i++)
-                {
-                    if (Directories.GetValue(i)?.SourceId == srcId)
-                    {
-                        removedDirs.Add(i);
-                        Directories.Remove(i);
-                    }
-                }
-
-                var filter = new ArrayFilter<SourceRecord>(x => !removedDirs.Contains(x.D));
-                foreach (var item in _files.Values)
-                    FilterFileSources(filter, item);
-                SyncSources = SyncSources.Where(x => x.Id != srcId).ToArray();
-            }
-        }
-
         public Storage(string path)
         {
             _filesFileName = Path.Combine(path, "index.bin");
@@ -198,10 +177,8 @@ namespace Photos.Core
             if (Settings == null || Settings.ThumbnailDrawSize == 0 || Settings.Filters == null)
                 settings = new SettingsRecord()
                 {
-                    ThumbnailSize = PhotoProvider.LargeThumbnailSize,
                     ThumbnailDrawSize = PhotoProvider.MediumThumbnailSize,
                     Dirs = new string[0],
-                    CreationTimeUtc = FileRecord.TimeTo(DateTime.UtcNow),
                 };
         }
 
