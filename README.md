@@ -11,7 +11,6 @@ Reviewed at commit `0687b1e` ("csv removed"): 72 tracked files, 46 C# files, abo
 | Area | Count | Most important |
 | --- | --- | --- |
 | Errors and likely bugs | 9 | GPS photos fail to index (critical) |
-| Unused code and files | 6 | `cities.csv`, `Spatial.cs`, city/country lookup |
 | Code quality and performance | 8 | Full-image decode on the render thread |
 | User experience | 10 | Slideshow Escape closes one screen only |
 | Feature upgrades | 12 | Shift-click range select, Empty deleted images |
@@ -32,21 +31,6 @@ The first two rows break or leak data today; fix them first.
 | 7 | Low | `PhotoProvider.cs:495`, `:530` | `DeletedOriginals` is never pruned. Files removed or moved outside the app leave stale entries, and the deleted-images row can stay visible with nothing in it. | Prune entries whose trashed file no longer exists, at startup. |
 | 8 | Low | `FilterService.cs:182` | Folder rows with only hidden photos are kept. Clicking one shows an empty grid. | Mark such rows as hidden-only, or skip them in the filter. |
 | 9 | Low | `DB.Settings = DB.Settings with {…}` (many places) | Read-modify-write of settings from the UI thread and background tasks can drop a change (last write wins). | Add a single `UpdateSettings(Func<SettingsRecord, SettingsRecord>)` with a lock. |
-
-## Unused code and files
-
-A scan of all C# members found none referenced only at their declaration; what remains unused is the city/country feature you removed from the build, plus packaging files.
-
-| Item | Status | Action |
-| --- | --- | --- |
-| `_misc/cities.csv` (754 KB) | Still tracked, no longer embedded | Delete with the lookup (bug 1) |
-| `Photos.Core/Spatial.cs` (`GeoCoordinate`) | Used only by the city lookup | Delete; keep the GPS degree parsing in `FillExifFields` |
-| City, country and camera-model storage in `StoredTypes.cs` (`OptionalKeys.City`, `Country`, `CameraModel`, `StringOptions`) | Only shown in Image info; filters removed | Remove if you don't want them in Image info |
-| `Photos.Desktop/Properties/PublishProfiles/FolderProfile.pubxml` | Not read by the build | Keep only if you publish from Visual Studio |
-| `setup.iss` | Points at `..\Photos.Community\` and `_build\setup_license.txt`, neither in the repo | Fix paths or delete |
-| Key and constant enums in `Events.cs`, `Exif.cs`, `RegistryUtils.cs` | Many values unused | Leave: they mirror OS/EXIF tables |
-
-The unused GPS lookup also makes indexing slower: it loads and parses the CSV, then scans every city for each photo with GPS.
 
 ## Code quality and performance
 
