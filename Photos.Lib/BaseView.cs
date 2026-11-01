@@ -126,9 +126,6 @@ namespace Photos.Lib
             }
         }
 
-        //{
-        //    else
-        //}
 
         public void RemoveChildren(Predicate<BaseView> filter) => _children.RemoveAll(x =>
         {

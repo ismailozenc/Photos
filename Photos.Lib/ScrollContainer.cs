@@ -101,8 +101,6 @@ namespace Photos.Lib
             {
                 e.Consume(this);
             }
-            //{
-            //}
             else if (e.Kind == libMouseEventKind.Wheel)
             {
                 ScrollOffsetY -= (int)(e.Offset.Y * ScrollStep);

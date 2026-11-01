@@ -390,10 +390,7 @@ namespace Photos.Core
 
         private void GoBack()
         {
-            //{ 
             //    // TODO: cancel?
-            //}
-            //else 
             if (ThumbnailView.Enabled)
                 Window.Close();
             else if (_compareView.Enabled)

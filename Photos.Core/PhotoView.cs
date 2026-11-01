@@ -122,12 +122,10 @@ namespace Photos.Core
                 Enabled = { Func = () => !IsEditMode }
             });
 
-            //{
             //    Link = Attach(() => OuterRect),
             //    Enabled = { Func = () => _crop != null },
             //    GetPosition = () => _lastTransform.MapPoint(new SKPoint(_crop.Value.MidX * _lastRenderInfo.Width, _crop.Value.MidY * _lastRenderInfo.Height)),
             //    UpdatePosition = p =>
-            //    {
             //    },
 
             var dragButtons = new List<DragButton>();
@@ -276,7 +274,6 @@ namespace Photos.Core
             };
             StyleButton(ToolbarMenu.MenuButton);
 
-            //{
             //    Parent = this,
             //    Link = () => SKRect.Create(Size.Width - ButtonPanelButtonSize * 4, MainView.ButtonPadding, ButtonPanelButtonSize * 4, Size.Height - ButtonPanelButtonSize),
 
@@ -713,11 +710,7 @@ namespace Photos.Core
                 else if (e.Kind == libMouseEventKind.Up)
                 {
                     _isDragging = false;
-                    //{
                     //    //Debug.WriteLine(speed);
-                    //    {
-                    //    }
-                    //}
                     Invalidate();
                 }
                 else if (e.Kind == libMouseEventKind.Down)

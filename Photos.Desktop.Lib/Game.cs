@@ -36,7 +36,6 @@ namespace Photos.Desktop
         bool _layoutWasRunning;
         MainView _mainView;
         bool _slideshowHintShown;
-        readonly Stopwatch _idle = Stopwatch.StartNew();
         static readonly TimeSpan PrivateIdleLimit = TimeSpan.FromMinutes(5);
         SKSurface skSurface;
 
@@ -248,7 +247,7 @@ namespace Photos.Desktop
 
         private void Game_MouseMove(MouseMoveEventArgs obj)
         {
-            _idle.Restart();
+            photoProvider?.NoteUserInput();
             var isDown = IsMouseButtonDown(MouseButton.Left);
             var curPoint = new SKPoint(obj.X, obj.Y);
             var e = new libMouseEvent(isDown ? downEvent : null)
@@ -266,7 +265,7 @@ namespace Photos.Desktop
 
         private void Game_MouseDown(MouseButtonEventArgs obj)
         {
-            _idle.Restart();
+            photoProvider?.NoteUserInput();
             lastPoint = MousePosition.ToSK();
             downEvent = new libMouseEvent()
             {
@@ -306,7 +305,7 @@ namespace Photos.Desktop
 
         private void Game_KeyUp(KeyboardKeyEventArgs e)
         {
-            _idle.Restart();
+            photoProvider?.NoteUserInput();
             _window.RouteKeyEvent(new libKeyMessage() { Key = (libKeys)e.Key });
         }
 
@@ -401,10 +400,10 @@ namespace Photos.Desktop
         {
             NativeDialogs.RunPending();
             if (photoProvider != null && photoProvider.PrivateUnlocked
-                && (_idle.Elapsed > PrivateIdleLimit || WindowState == WindowState.Minimized))
+                && (photoProvider.IdleTime > PrivateIdleLimit || WindowState == WindowState.Minimized))
                 photoProvider.LockPrivate();
             if (photoProvider != null && photoProvider.TakeDiskChange())
-                photoProvider.UpdateLibraryMaybe(new IndexTaskConfig() { DoneMessage = "library refresh completed" });
+                photoProvider.UpdateLibraryMaybe(new IndexTaskConfig()); // no message: the user did not ask for this scan
             if (_slideshows != null && _slideshows.IsRunning)
                 _slideshows.Tick();
 
@@ -431,6 +430,15 @@ namespace Photos.Desktop
         {
             _monitors?.Stop();
             _slideshows?.Stop();
+            // Disposing the library flushes the delayed settings save and writes the index.
+            try
+            {
+                photoProvider?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Core.Utils.LogError(ex);
+            }
             skiaCtx?.Dispose();
             skSurface?.Dispose();
             base.OnUnload();

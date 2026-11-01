@@ -17,7 +17,6 @@ namespace Photos.Desktop
     /// </summary>
     internal sealed class SlideshowWindow : GameWindow
     {
-        public int IntervalMs = 5000;
 
         readonly PhotoProvider _provider;
         readonly Stopwatch _timer = new Stopwatch();
@@ -72,7 +71,7 @@ namespace Photos.Desktop
             Context.MakeCurrent();
             EnsureSurface();
 
-            if (!_paused && _timer.ElapsedMilliseconds >= IntervalMs)
+            if (!_paused && _timer.ElapsedMilliseconds >= _provider.DB.Settings.SlideshowIntervalMs)
                 Step(1);
 
             _loader.Poll();
@@ -152,6 +151,7 @@ namespace Photos.Desktop
 
         void HandleKeyDown(KeyboardKeyEventArgs e)
         {
+            _provider.NoteUserInput();
             switch (e.Key)
             {
                 case Keys.Escape:

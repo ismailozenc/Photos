@@ -255,16 +255,37 @@ namespace Photos.Core
         //const int WorkStatusDelay = 1000;
         public event Action OnDisplayOrderUpdate;
 
+        readonly Stopwatch _idle = Stopwatch.StartNew();
+
+        /// <summary>Time since the last mouse or key input in any window. Used to lock private folders when idle.</summary>
+        public TimeSpan IdleTime => _idle.Elapsed;
+
+        /// <summary>Called by every window on input, so the idle lock measures real inactivity.</summary>
+        public void NoteUserInput() => _idle.Restart();
+
         readonly List<FileSystemWatcher> _watchers = new List<FileSystemWatcher>();
         System.Threading.Timer _watchDebounce;
         volatile bool _diskChanged;
 
+        volatile bool _watchersBroken;
+
+        /// <summary>Changes each time a disk-triggered rescan starts, so views can drop cached folder counts.</summary>
+        public int LibraryScanVersion { get; private set; }
+
         /// <summary>True once after the library folders changed on disk. The host then rescans on its render thread.</summary>
         public bool TakeDiskChange()
         {
+            if (_watchersBroken)
+            {
+                // The watcher dropped events (a bulk copy can overflow its buffer), so start again from a clean state.
+                _watchersBroken = false;
+                RefreshWatchers();
+            }
+
             if (!_diskChanged)
                 return false;
             _diskChanged = false;
+            LibraryScanVersion++;
             return true;
         }
 
@@ -287,6 +308,7 @@ namespace Photos.Core
                     watcher.Deleted += OnDiskChanged;
                     watcher.Renamed += OnDiskChanged;
                     watcher.Changed += OnDiskChanged;
+                    watcher.Error += OnWatcherError;
                     watcher.EnableRaisingEvents = true;
                     _watchers.Add(watcher);
                 }
@@ -297,9 +319,21 @@ namespace Photos.Core
             }
         }
 
+        /// <summary>A watcher that lost events is rebuilt on the render thread, and the library is rescanned.</summary>
+        void OnWatcherError(object sender, ErrorEventArgs e)
+        {
+            Utils.LogError(e.GetException());
+            _watchersBroken = true;
+            _diskChanged = true;
+        }
+
         /// <summary>Several events arrive for one change; the rescan waits three seconds after the last one.</summary>
         void OnDiskChanged(object sender, FileSystemEventArgs e)
         {
+            // The app's own moves into deleted-images folders must not trigger a rescan.
+            if (e.FullPath != null && e.FullPath.Contains(DeletedFolderName, StringComparison.OrdinalIgnoreCase))
+                return;
+
             lock (_watchers)
             {
                 _watchDebounce ??= new System.Threading.Timer(_ => _diskChanged = true, null,
@@ -775,6 +809,9 @@ namespace Photos.Core
             if (!PrivateUnlocked)
                 return;
             PrivateUnlocked = false;
+            // Private photos were decoded while unlocked, so drop the caches rather than leave them in memory.
+            _scaledThumbnails.Clear();
+            _microCache.Clear();
             EnqueueRefreshDisplayOrder();
         }
 

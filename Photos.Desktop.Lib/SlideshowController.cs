@@ -50,7 +50,6 @@ namespace Photos.Desktop
                     var d = displays[i];
                     var window = new SlideshowWindow(_provider, d.X, d.Y, d.Width, d.Height, starts[i]);
                     window.OnEscape = RequestStop;
-                    window.IntervalMs = _provider.DB.Settings.SlideshowIntervalMs;
                     _windows.Add(window); // added first, so Stop disposes it if Initialize fails
                     window.Initialize();
                 }

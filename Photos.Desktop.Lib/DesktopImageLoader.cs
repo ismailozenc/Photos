@@ -15,8 +15,6 @@ namespace Photos.Desktop
     {
         static void LoadMagic(FullImageData data)
         {
-            //try
-            //{
             using var image = new MagickImage();
             MagickReadSettings settings = null;
             if (Path.GetExtension(data.FullPath)?.ToLowerInvariant() == ".svg")
@@ -33,9 +31,6 @@ namespace Photos.Desktop
             data.Bitmap = new SKBitmap((int)image.Width, (int)image.Height, SKColorType.Rgba8888, image.HasAlpha ? SKAlphaType.Unpremul : SKAlphaType.Opaque);
             var pix = data.Bitmap.GetPixels(out var len);
             Marshal.Copy(buf, 0, pix, (int)len);
-            //}
-            //{
-            //}
         }
 
         static bool _registered;

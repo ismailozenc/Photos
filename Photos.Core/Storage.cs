@@ -54,7 +54,6 @@ namespace Photos.Core
                 throw new ArgumentException();
 
             dat.TimeStamp = FileRecord.TimeTo(DateTime.UtcNow);
-            //else
             lock (_additionalImageDataLock)
             {
                 AdditionalImageData = AdditionalImageData.SetItem(file.Sig, dat);
@@ -122,13 +121,16 @@ namespace Photos.Core
         /// </summary>
         public void UpdateSettings(Func<SettingsRecord, SettingsRecord> change)
         {
+            SettingsRecord old, updated;
             lock (_settingsLock)
             {
-                var old = settings;
-                settings = change(old);
-                OnSettingsUpdate?.Invoke(old, settings);
-                SaveSettings();
+                old = settings;
+                settings = updated = change(old);
             }
+
+            // Outside the lock: a handler may take other locks or wait on another thread.
+            OnSettingsUpdate?.Invoke(old, updated);
+            SaveSettings();
         }
 
         /// <summary>Saves the settings shortly after the last change; rapid changes such as slider drags share one write.</summary>
@@ -458,7 +460,6 @@ namespace Photos.Core
         public static void Serialize<T>(T obj, Stream file)
         {
             MessagePackSerializer.Serialize(file, obj, options: SerializerOptions);
-            //{
             //    IncludeFields = true,
             //    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault,
             //    IgnoreReadOnlyProperties = true

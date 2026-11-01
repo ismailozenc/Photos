@@ -353,12 +353,9 @@ namespace Photos.Core
             var activeFilters = fg.Filters.Values.Where(x => IsFilterActive(fg, x)).ToArray();
             var activeCount = activeFilters.Length;
 
-            //{
             //    Text = activeCount == 0 ? "- no items selected -" : $"- clear {activeCount} / {fg.Filters.Count} items -",
             //    TextAlign = SkiaSharp.SKTextAlign.Center,
             //    OnClick = () =>
-            //    {
-            //    }
 
             ActiveFiltersMenu(m, false, ActiveSettings.Filters.Where(x => x.Key == fg.GroupId).ToDictionary(x => x.Key, x => x.Value), withRecent: true);
 

@@ -96,6 +96,7 @@ namespace Photos.Desktop
 
         void HandleKeyDown(KeyboardKeyEventArgs e)
         {
+            _provider.NoteUserInput();
             switch (e.Key)
             {
                 case Keys.Escape:

@@ -125,7 +125,6 @@ namespace Photos.Lib
             };
 
             //new TextLabel() // # selected
-            //{
             //    Parent = DialogContainer,
             //    Text = () => $"{ActiveMenu.Items.Where(x => x.Selected()).Count()}/{ActiveMenu.Items.Count}",
             //    Paint = { Color = Color.WithAlpha(0xA0), TextAlign = SKTextAlign.Right },

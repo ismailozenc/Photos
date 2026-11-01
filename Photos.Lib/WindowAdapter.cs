@@ -67,14 +67,7 @@ namespace Photos.Lib
             _lastRender = _renderHist[_cntr] = DateTime.UtcNow;
 
             //bool lockWasTaken = false;
-            //try
-            //{
-            //    {
-            //    }
-            //}
             //finally
-            //{
-            //}
 
             lock (_lock)
             {

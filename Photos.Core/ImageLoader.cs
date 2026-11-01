@@ -34,8 +34,6 @@ namespace Photos.Core
                     // GetScaledDimensions does not work in 2.88.6
                     // https://github.com/mono/SkiaSharp/issues/2645
 
-                    //    {
-                    //    }
                     imgData.Bitmap = new SKBitmap(preScale.Width, preScale.Height, sKCodec.Info.ColorType, sKCodec.Info.AlphaType);
                     var codecRes = sKCodec.GetPixels(imgData.Bitmap.Info, imgData.Bitmap.GetPixels(out var length));
                     if (codecRes != SKCodecResult.Success && codecRes != SKCodecResult.IncompleteInput)
@@ -44,7 +42,6 @@ namespace Photos.Core
                         imgData.Bitmap = null;
                     }
                 }
-                //else
 
 
                 if (imgData.Bitmap == null)

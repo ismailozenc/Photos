@@ -39,6 +39,8 @@ namespace Photos.Desktop
         List<FileFilter> _visible = new List<FileFilter>();
         HashSet<string> _parents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int _deletedCount;
+        int _scanVersion = -1;
+        HashSet<string> _trashIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         bool _menuOpen;
         float _menuX, _menuY;
@@ -55,9 +57,16 @@ namespace Photos.Desktop
 
         protected override void Advance()
         {
+            if (_scanVersion != _provider.LibraryScanVersion)
+            {
+                _scanVersion = _provider.LibraryScanVersion;
+                _totals.Clear(); // files changed on disk, so the counted totals are stale
+            }
+
             if (_rowsVersion != _provider.DisplayVersion)
             {
                 _rowsVersion = _provider.DisplayVersion;
+                _trashIds = new HashSet<string>(_provider.TrashFolderIds, StringComparer.OrdinalIgnoreCase);
                 _group = _provider.FilterService.FilterGroups.FirstOrDefault(g => g.GroupId == FilterService.FolderFilter);
                 _rows = _group?.Filters.Values.OrderBy(f => f.PreText).ThenBy(f => f.Text).ToList() ?? new List<FileFilter>();
                 _deletedCount = _provider.DeletedCopyCount;
@@ -141,16 +150,16 @@ namespace Photos.Desktop
                 string rel = row.Text.Trim().Trim('\\', '/');
                 int depth = rel.Count(c => c == '\\' || c == '/');
                 string name = rel.Length == 0 ? "<root>" : rel.Split('\\', '/').Last();
-                if (_provider.TrashFolderIds.Contains(row.Id))
+                if (_trashIds.Contains(row.Id))
                     name += $" ({_deletedCount})";
 
                 bool isPrivate = IsPrivateRow(row.Id);
-                bool active = _provider.TrashFolderIds.Contains(row.Id) ? _provider.ShowDeleted : _group != null && _provider.FilterService.IsFilterActive(_group, row);
+                bool active = IsSelectedFolder(row);
                 float baseline = top + RowHeight * 0.7f;
                 bool excluded = _provider.IsExcludedFolder(row.Id);
                 if (excluded)
                     name += " (hidden)";
-                bool allHidden = row.Count == 0 && !_provider.TrashFolderIds.Contains(row.Id);
+                bool allHidden = row.Count == 0 && !_trashIds.Contains(row.Id);
                 if (allHidden)
                     name += " (all hidden)";
                 var namePaint = isPrivate ? privatePaint : excluded || allHidden ? excludedPaint : active ? activePaint : textPaint;
@@ -168,7 +177,8 @@ namespace Photos.Desktop
                 string shownText = hasTotal ? $"{shown}/{total}" : shown.ToString();
                 float right = width - Padding;
                 canvas.DrawText(shownText, right, baseline, SKTextAlign.Right, font, countPaint);
-                if (hasTotal && total > shown)
+                // While private folders are locked, the hidden count would reveal how many photos they hold.
+                if (hasTotal && total > shown && (_provider.PrivateUnlocked || !_provider.HasPrivateFolders))
                 {
                     float shownWidth = font.MeasureText(shownText);
                     canvas.DrawText($"{total - shown} not shown   ", right - shownWidth, baseline, SKTextAlign.Right, font, hiddenPaint);
@@ -280,7 +290,7 @@ namespace Photos.Desktop
             dir.Length > parent.Length && dir.StartsWith(parent, StringComparison.OrdinalIgnoreCase) && (dir[parent.Length] == '\\' || dir[parent.Length] == '/');
 
         /// <summary>True when the folder is highlighted: its filter is on, or it is the deleted-images folder while that view is open.</summary>
-        bool IsSelectedFolder(FileFilter row) => _provider.TrashFolderIds.Contains(row.Id)
+        bool IsSelectedFolder(FileFilter row) => _trashIds.Contains(row.Id)
             ? _provider.ShowDeleted
             : _group != null && _provider.FilterService.IsFilterActive(_group, row);
 
@@ -289,11 +299,14 @@ namespace Photos.Desktop
         /// <summary>The rows that are shown: a folder under a collapsed folder is hidden. Also finds the folders that have subfolders.</summary>
         void RebuildVisible()
         {
+            // A private folder is left out entirely while locked: its name and counts would leak what it holds.
+            var listed = _provider.PrivateUnlocked ? _rows : _rows.Where(r => !IsPrivateRow(r.Id)).ToList();
+
             _parents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var row in _rows)
-                if (_rows.Any(other => IsChildOf(other.Id, row.Id)))
+            foreach (var row in listed)
+                if (listed.Any(other => IsChildOf(other.Id, row.Id)))
                     _parents.Add(row.Id);
-            _visible = _rows.Where(r => !_collapsed.Any(c => IsChildOf(r.Id, c))).ToList();
+            _visible = listed.Where(r => !_collapsed.Any(c => IsChildOf(r.Id, c))).ToList();
         }
 
         /// <summary>True when the folder id lies inside the parent folder. A source root ("0/") holds every folder of that source.</summary>
@@ -324,7 +337,7 @@ namespace Photos.Desktop
             if (index < 0 || index >= _visible.Count)
                 return;
             var row = _visible[index];
-            if (_provider.TrashFolderIds.Contains(row.Id))
+            if (_trashIds.Contains(row.Id))
             {
                 _provider.SetShowDeleted(!_provider.ShowDeleted);
                 return;
@@ -416,6 +429,7 @@ namespace Photos.Desktop
 
         void HandleKeyDown(KeyboardKeyEventArgs e)
         {
+            _provider.NoteUserInput();
             switch (e.Key)
             {
                 case Keys.Escape:
@@ -442,6 +456,7 @@ namespace Photos.Desktop
 
         void HandleMouseDown(MouseButtonEventArgs e)
         {
+            _provider.NoteUserInput();
             float x = MousePosition.X;
             float y = MousePosition.Y;
 
@@ -482,6 +497,7 @@ namespace Photos.Desktop
 
         void HandleMouseWheel(MouseWheelEventArgs e)
         {
+            _provider.NoteUserInput();
             _scroll = Math.Clamp(_scroll - e.OffsetY * RowHeight, 0, MaxScroll(ClientSize.Y));
         }
     }
