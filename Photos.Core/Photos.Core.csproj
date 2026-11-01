@@ -12,10 +12,6 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <EmbeddedResource Include="..\_misc\cities.csv" Link="cities.csv" />
-  </ItemGroup>
-  
-  <ItemGroup>
  <PackageReference Include="MessagePack" Version="3.1.9" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
   </ItemGroup>
