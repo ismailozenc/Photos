@@ -59,4 +59,4 @@ Remaining work, in priority order.
 - [ ] Hashed, changeable private password; auto-lock
 - [ ] Update NuGet packages; rewrite the README
 - [ ] Shift-click, Ctrl+A, Escape for selection
-- [ ] Empty deleted images; duplicate finder
+- [ ] Duplicate finder view
