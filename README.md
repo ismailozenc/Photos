@@ -103,7 +103,7 @@ Private folders only hide photos in the app's own views; anyone with access to t
 - **Thumbnails on disk.** Private photos' thumbnails sit unencrypted in `large.bin` and `tiny.bin`, and the files stay readable in Explorer. Say so in the UI, or encrypt the private thumbnails.
 - **Packages.** Checked against published advisories: MessagePack 3.1.12, Magick.NET-Q8 15.0.0 and SkiaSharp 4.154.0 are past the fixed versions. Transitive and test packages are not checked. Confirm with `dotnet list package --vulnerable --include-transitive` on Windows.
 - **No CI.** A GitHub Actions workflow on `windows-latest` running `dotnet build` and `dotnet test` on each push would catch compile errors the moment they land.
-- **Thin tests.** `Photos.Tests` has 10 tests covering private-folder rules, the slideshow planner and two ranking cases. Storage upgrades, visibility rules and deleted-image moves are untested, and those are where data can be lost.
+- **Thin tests.** `Photos.Tests` (xUnit v3) has 10 tests covering private-folder rules, the slideshow planner and two ranking cases. Storage upgrades, visibility rules and deleted-image moves are untested, and those are where data can be lost.
 - **No installer or licence.** `setup.iss`, `LICENSE.TXT` and `THIRD-PARTY-NOTICES.TXT` were removed. The original project is MIT-licensed, which usually means a fork keeps its licence and copyright notice.
 - **README and repo name.** There are no build or usage instructions for someone new to the fork, and `git push` reports the repository moved to `ismailozenc/Photos`; update the `origin` URL.
 
