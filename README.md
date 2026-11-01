@@ -8,22 +8,9 @@ Reviewed at commit `0687b1e` ("csv removed"): 72 tracked files, 46 C# files, abo
 
 | Area | Count | Most important |
 | --- | --- | --- |
-| Code quality and performance | 7 | Visibility checks run on every refresh |
 | User experience | 10 | Selection has no range select or select-all |
 | Feature upgrades | 12 | Shift-click range select, Empty deleted images |
 | Security, build, packaging | 5 | Private folders are UI-only; password in source |
-
-## Code quality and performance
-
-The biggest remaining win is making the per-photo visibility checks cheap; it matters at the 100k-photo scale the original app targets.
-
-1. **Visibility checks per refresh.** `IsTrashedSource`, `IsPrivateHidden` and `IsExcludedSource` (`PhotoProvider.cs`) build a path string and lower-case it for every copy of every photo on each refresh. Precompute sets of directory indexes once per refresh and test `s.D` against them.
-2. **Prefetch** the next slide and the next preview photo while the current one is shown. Compare view decodes still run on the render thread.
-3. **Debounce settings saves.** Every change writes the settings file; a slider drag writes it on every step.
-4. **Folder list refresh.** `FolderWindow.Advance` rebuilds and sorts all rows every 250 ms. Rebuild only on `OnDisplayOrderUpdate`.
-5. **Folder totals** walk the whole tree once per folder row, so a deep library is read many times. Walk each library root once and sum per folder.
-6. **Nullable reference types are off** in all projects. Turning them on in `Photos.Core` would catch the null paths around `DB.Directories.GetValue` and `Settings` arrays.
-7. **No tests.** `RankingEngine`, `PrivateFolderRules`, `SlideshowPlanner`, `MonitorRoles` and `UniquePath` are pure functions and easy to cover with an xUnit project.
 
 ## User experience improvements
 
