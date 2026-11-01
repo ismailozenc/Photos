@@ -17,7 +17,7 @@ Reviewed at commit `432642f`, updated after `7ef7081`. No .NET SDK was available
 | Code quality | 5 | `PhotoProvider` is over 1,000 lines |
 | User experience | 1 | Monitor roles |
 | Feature upgrades | 7 | Duplicate finder view |
-| Security, tests and packaging | 7 | Password in source; no CI |
+| Security, tests and packaging | 6 | Password in source; no CI |
 
 ## Build and compile
 
@@ -100,7 +100,6 @@ Private folders only hide photos in the app's own views; anyone with access to t
 
 - **Password in source.** `PrivateFolderRules.cs` holds `"1234"` as a constant. Store a salted hash (PBKDF2) in settings and add a "Change password" item.
 - **Thumbnails on disk.** Private photos' thumbnails sit unencrypted in `large.bin` and `tiny.bin`, and the files stay readable in Explorer. Say so in the UI, or encrypt the private thumbnails.
-- **Packages.** Checked against published advisories: MessagePack 3.1.12, Magick.NET-Q8 15.0.0 and SkiaSharp 4.154.0 are past the fixed versions. Transitive and test packages are not checked. Confirm with `dotnet list package --vulnerable --include-transitive` on Windows.
 - **No CI.** A GitHub Actions workflow on `windows-latest` running `dotnet build` and `dotnet test` on each push would catch compile errors the moment they land.
 - **Thin tests.** `Photos.Tests` (xUnit v3) has 10 tests covering private-folder rules, the slideshow planner and two ranking cases. Storage upgrades, visibility rules and deleted-image moves are untested, and those are where data can be lost.
 - **No installer or licence.** `setup.iss`, `LICENSE.TXT` and `THIRD-PARTY-NOTICES.TXT` were removed. The original project is MIT-licensed, which usually means a fork keeps its licence and copyright notice.
