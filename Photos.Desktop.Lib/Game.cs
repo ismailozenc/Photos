@@ -140,10 +140,6 @@ namespace Photos.Desktop
                 GetClipboard = () => ClipboardString,
                 OpenUrl = url =>
                 {
-                    if (url.StartsWith("geo:"))
-                        url = "https://maps.google.com/?q=" + url[4..];
-                    
-                    
                     if (!url.StartsWith("https://") && !url.StartsWith("file://"))
                         throw new NotImplementedException();
 

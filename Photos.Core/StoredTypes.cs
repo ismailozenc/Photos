@@ -10,12 +10,6 @@ using System.Threading.Tasks;
 
 namespace Photos.Core.StoredTypes
 {
-    public enum OptionalKeys
-    {
-        Lat = 1,
-        Lon = 2
-    }
-
     [MessagePackObject]
     public class DirectoryRecord
     {
@@ -134,9 +128,6 @@ namespace Photos.Core.StoredTypes
         [Key(10)]
         public ulong Sig;
 
-        [Key(11)]
-        private Dictionary<int, int> OptionalData; // TODO: test!!!
-
         [IgnoreMember]
         public long PrioTicks;
 
@@ -145,21 +136,6 @@ namespace Photos.Core.StoredTypes
         
         [IgnoreMember]
         internal bool IndexFailed;
-
-        public int GetOptional(OptionalKeys key) => OptionalData?.TryGetValue((int)key, out var res) == true ? res : 0;
-        public void SetOptional(OptionalKeys key, int val)
-        {
-            OptionalData ??= new ();
-
-            OptionalData[(int)key] = val;
-        }
-
-        public IEnumerable<(OptionalKeys Key, int Value)> EnumOptionalData()
-        {
-            if (OptionalData != null)
-                foreach (var item in OptionalData)
-                    yield return ((OptionalKeys)item.Key, item.Value);
-        }
 
         public static DateTime TimeFrom(long time) => new DateTime((int)(time / 10000_000000L), (int)(time / 100_000000L % 100), (int)(time / 1_000000L % 100),
             (int)(time / 1_0000 % 100), (int)(time / 1_00 % 100), (int)(time % 100));
@@ -217,7 +193,6 @@ namespace Photos.Core.StoredTypes
         public bool IsIndexed() => Sig != 0 && TS != 0 && MTS != 0;
 
         public const int CurrentHeaderVersion = 2;
-        const int DegreeMultiply = 1_000_000;
 
         public void FillExifFields(SKData skData, Storage db)
         {
@@ -225,35 +200,7 @@ namespace Photos.Core.StoredTypes
 
             if (exif.TryGetSingleValue(ExifTags.DateTimeOriginal, out DateTime dateTime) || exif.TryGetSingleValue(ExifTags.DateTime, out dateTime))
                 DT = TimeTo(dateTime);
-
-            var lat = exif.GetTagValue(ExifTags.GPSLatitude);
-            var lon = exif.GetTagValue(ExifTags.GPSLongitude);
-            if (lat?.Length == 3 && lon?.Length == 3 && lat.Concat(lon).All(x => x is double))
-            {
-                var la = (double)lat[0] + (double)lat[1] / 60 + (double)lat[2] / 3600;
-                var lo = (double)lon[0] + (double)lon[1] / 60 + (double)lon[2] / 3600;
-
-                if (exif.TryGetSingleValue(ExifTags.GPSLatitudeRef, out string lRef) && lRef == "S")
-                    la = -la;
-                if (exif.TryGetSingleValue(ExifTags.GPSLongitudeRef, out lRef) && lRef == "W")
-                    lo = -lo;
-
-
-                if (ValidDegree(la) && ValidDegree(lo))
-                {
-                    SetOptional(OptionalKeys.Lat, SaveDegree(la));
-                    SetOptional(OptionalKeys.Lon, SaveDegree(lo));
-
-                }
-            }
         }
-
-        /// <summary>A GPS value is usable when it is a finite, non-zero number.</summary>
-        static bool ValidDegree(double d) => !double.IsNaN(d) && !double.IsInfinity(d) && d != 0;
-
-        private static int SaveDegree(double d) => (int)(d * DegreeMultiply);
-        public static double LoadDegree(int v) => (double)v / DegreeMultiply;
-
     }
     [MessagePackObject]
     public class FilesSettings

@@ -1027,15 +1027,6 @@ namespace Photos.Core
             if (file == CurrentFile)
                 m.Items.Add(SetupItem(new() { Text = $"Rendered as: {_lastRenderInfo.Width}x{_lastRenderInfo.Height} {_lastRenderInfo.BytesSize64 >> 20} MB" }));
 
-            var lo = FileRecord.LoadDegree(file.GetOptional(OptionalKeys.Lon));
-            var la = FileRecord.LoadDegree(file.GetOptional(OptionalKeys.Lat));
-            if (la != 0 && lo != 0)
-                m.Items.Add(new()
-                {
-                    Text = $"GPS Position: {la} {lo}",
-                    OnClick = () => Window.OpenUrl(FormattableString.Invariant($"geo:{la},{lo}"))
-                });
-
             m.Items.Add(SetupItem(new() { Text = $"File location:" }));
             var locItems = file.Src
                 .Select(x => (path: x.GetFullPath(photoProvider), dir: photoProvider.DB.Directories.GetValue(x.D)))

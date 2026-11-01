@@ -114,15 +114,6 @@ namespace Photos.Core
                 var file = files[0];
                 items.Add(new MenuItem() { Text = "Info", Submenu = x => _photoView.BuildImageInfo(x, file) });
 
-                var lat = FileRecord.LoadDegree(file.GetOptional(OptionalKeys.Lat));
-                var lon = FileRecord.LoadDegree(file.GetOptional(OptionalKeys.Lon));
-                if (lat != 0 && lon != 0)
-                    items.Add(new MenuItem()
-                    {
-                        Text = "Show on map",
-                        OnClick = () => Window.OpenUrl(FormattableString.Invariant($"geo:{lat},{lon}")),
-                        ReturnLevel = Menu.CloseMenuLevel,
-                    });
 
                 if (OperatingSystem.IsWindows())
                     foreach (var src in file.Src)

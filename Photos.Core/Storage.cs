@@ -338,15 +338,6 @@ namespace Photos.Core
                 IsDirty = true;
             }
 
-            foreach (var item in newFile.EnumOptionalData())
-            {
-                if (existingFile.GetOptional(item.Key) != item.Value)
-                {
-                    existingFile.SetOptional(item.Key, item.Value);
-                    IsDirty = true;
-                }
-            }
-
             if (existingFile.GetFlag(FileRecordFlags.FlagMetadataRefreshRequired))
             {
                 existingFile.ResetFlag(FileRecordFlags.FlagMetadataRefreshRequired);

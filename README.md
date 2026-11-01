@@ -4,13 +4,13 @@ Nov 1, 2026 · @ismail özenç
 
 ## Summary
 
-The fork has one breaking bug that needs fixing before the next library scan: removing `cities.csv` from the build makes indexing throw for every photo that has GPS data. The other high-priority items are that the compare view ignores private, deleted and hidden folders, and that bulk delete rewrites the whole index once per photo.
+The breaking indexing bug is fixed: GPS photos failed to index once `cities.csv` was removed, and all GPS handling is now gone. The other high-priority items are that the compare view ignores private, deleted and hidden folders, and that bulk delete rewrites the whole index once per photo.
 
 Reviewed at commit `0687b1e` ("csv removed"): 72 tracked files, 46 C# files, about 13,000 lines. The repo has no tests and has not been compiled in this review, so line numbers are from source reading only.
 
 | Area | Count | Most important |
 | --- | --- | --- |
-| Errors and likely bugs | 9 | GPS photos fail to index (critical) |
+| Errors and likely bugs | 9 | Compare view ignores private, deleted and hidden folders |
 | Code quality and performance | 8 | Full-image decode on the render thread |
 | User experience | 10 | Slideshow Escape closes one screen only |
 | Feature upgrades | 12 | Shift-click range select, Empty deleted images |
@@ -22,7 +22,7 @@ The first two rows break or leak data today; fix them first.
 
 | # | Severity | Where | Problem | Fix |
 | --- | --- | --- | --- | --- |
-| 1 | Critical | `Photos.Core/StoredTypes.cs:286` | `cities.csv` is no longer embedded, but `FillExifFields` still loads it. `GetResource` calls `.Single()`, which throws, so every photo with GPS fails to index. | Remove the city/country lookup (and `Spatial.cs`), or restore the embedded resource. |
+| 1 | Resolved | `Photos.Core/StoredTypes.cs` | GPS photos failed to index after `cities.csv` was removed. | GPS handling, the city lookup, `Spatial.cs` and the stored GPS values are removed. |
 | 2 | High | `Photos.Core/CompareView.cs:57` | `LiveSignatures()` reads `DB.ListFiles()` directly. Private photos (while locked), deleted photos and hidden folders all appear in the compare view and in the ranking. | Build the set from the display order, or apply the same three checks. |
 | 3 | High | `Photos.Core/Storage.cs:171`, `PhotoProvider.cs:495` | Each moved copy calls `SaveFiles()` (full `index.bin` rewrite) and saves settings. Deleting 500 photos writes the index 500 times. | Batch: mark dirty and save once after `RunOnCopies`. |
 | 4 | Medium | `PreviewWindow.cs:54`, `SlideshowWindow.cs:106` | Full images are read and decoded on the main render thread. Each preview click or slide change freezes every window for the decode time. | Decode on a background task; show the previous image or the thumbnail until ready. |
@@ -64,7 +64,7 @@ Most gaps are about selection and the multi-monitor windows, which were added qu
 
 ## Feature upgrades
 
-The best-value upgrades build on data the app already has: signatures for duplicates, ratings and GPS.
+The best-value upgrades build on data the app already has: signatures for duplicates and ratings.
 
 | Feature | Effort | Why |
 | --- | --- | --- |
@@ -77,7 +77,6 @@ The best-value upgrades build on data the app already has: signatures for duplic
 | Drag photos out to Explorer | Medium | Common expectation on Windows. |
 | Automatic rescan with `FileSystemWatcher` | Medium | New files appear without "Check for new photos". |
 | Camera RAW (`.cr2`, `.nef`, `.arw`, `.raf`) via Magick.NET | Medium | Magick.NET is already a dependency. |
-| Map view from GPS | Large | GPS is stored for every photo that has it. |
 | Configurable private-folder password (hashed) | Small | See Security. |
 | Folder roles and layouts saved per monitor set | Medium | Home and office monitor setups differ. |
 
@@ -89,7 +88,7 @@ Private folders only hide photos in the app's own views; anyone with access to t
 - **Thumbnails on disk.** Private photos' thumbnails sit unencrypted in `large.bin` and `tiny.bin`, and the files stay readable in Explorer. Say so in the UI, or encrypt the private thumbnails.
 - **Compare view leak.** Bug 2 shows private photos while locked.
 - **Packages.** Magick.NET 14.15.0 and MessagePack 3.1.9 were flagged as vulnerable by NuGet earlier in this work. Run `dotnet list package --vulnerable` and update.
-- **Installer.** `setup.iss` points at `..\Photos.Community\` and a missing `_build\setup_license.txt` (lines 26 and 31), and still names the original publisher and copyright.
+- **Installer.** `setup.iss` and the publish profile were removed. Add an installer again if you need one.
 - **README.** It describes features this fork removed: mobile sync, country/city/camera filters and the project website. Rewrite it for the fork's features.
 - **Repo name.** `git push` reports the repository moved to `ismailozenc/Photos`; update the `origin` URL.
 
@@ -97,14 +96,14 @@ Private folders only hide photos in the app's own views; anyone with access to t
 
 Fix the indexing crash before the next scan, then the data leaks, then speed; features come after.
 
-- [ ] Remove the city/country lookup, `Spatial.cs` and `cities.csv` (bug 1)
+- [x] Remove the city/country lookup, `Spatial.cs`, `cities.csv` and all GPS handling (bug 1)
 - [ ] Apply private, deleted and hidden checks in the compare view (bug 2)
 - [ ] Batch index and settings saves for multi-photo actions (bug 3)
 - [ ] Decode preview and slideshow images in the background (bug 4)
 - [ ] Keep rendering while dialogs are open (bug 5)
 - [ ] Escape stops the slideshow on all screens (bug 6)
 - [ ] Hashed, changeable private password; auto-lock
-- [ ] Update NuGet packages; fix `setup.iss` and the README
+- [ ] Update NuGet packages; rewrite the README
 - [ ] Add a test project for the pure helpers
 - [ ] Shift-click, Ctrl+A, Escape for selection
 - [ ] Empty deleted images; duplicate finder
