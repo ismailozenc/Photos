@@ -153,7 +153,7 @@ namespace Photos.Core
             float w = image.Width * scale;
             float h = image.Height * scale;
             var dest = SKRect.Create(area.Left + (area.Width - w) / 2, area.Top + (area.Height - h) / 2, w, h);
-            ctx.DrawImage(image, dest);
+            ctx.DrawImage(image, dest, HighQualitySampling, null);
         }
 
         void DisposeImages()

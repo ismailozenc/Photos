@@ -903,7 +903,7 @@ namespace Photos.Core
                 cropTarget.Intersect(bounds);
                 var cropSource = inverse.MapRect(cropTarget);
 
-                ctx.DrawImage(bitmap, cropSource, cropTarget, p);
+                ctx.DrawImage(bitmap, cropSource, cropTarget, HighQualitySampling, p);
 
 
                 cropBorderPaint.Color = cropBorderPaint.Color.WithAlpha(isDragging ? (byte)0x50 : (byte)0x20);

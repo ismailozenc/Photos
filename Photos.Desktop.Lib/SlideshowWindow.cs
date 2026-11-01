@@ -130,7 +130,7 @@ namespace Photos.Desktop
             float scale = Math.Min(w / _image.Width, h / _image.Height);
             float dw = _image.Width * scale;
             float dh = _image.Height * scale;
-            canvas.DrawImage(_image, SKRect.Create((w - dw) / 2, (h - dh) / 2, dw, dh));
+            canvas.DrawImage(_image, SKRect.Create((w - dw) / 2, (h - dh) / 2, dw, dh), Photos.Lib.BaseView.HighQualitySampling, null);
         }
 
         void EnsureSurface()

@@ -83,14 +83,14 @@ namespace Photos.Desktop
                 float scale = Math.Min((float)width / _image.Width, (float)height / _image.Height);
                 float dw = _image.Width * scale;
                 float dh = _image.Height * scale;
-                canvas.DrawImage(_image, SKRect.Create((width - dw) / 2, (height - dh) / 2, dw, dh));
+                canvas.DrawImage(_image, SKRect.Create((width - dw) / 2, (height - dh) / 2, dw, dh), Photos.Lib.BaseView.HighQualitySampling, null);
             }
 
             if (_caption.Length > 0)
             {
                 using var paint = new SKPaint { Color = SKColors.White.WithAlpha(190), IsAntialias = true };
                 using var font = new SKFont(SKTypeface.Default, 18);
-                canvas.DrawText(_caption, 16, height - 16, font, paint);
+                canvas.DrawText(_caption, 16, height - 16, SKTextAlign.Left, font, paint);
             }
         }
 

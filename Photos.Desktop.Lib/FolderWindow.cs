@@ -110,7 +110,7 @@ namespace Photos.Desktop
             using var titleFont = new SKFont(SKTypeface.Default, 20);
             using var focusPaint = new SKPaint { Color = SKColors.LightGreen, Style = SKPaintStyle.Stroke, StrokeWidth = 2, IsAntialias = true };
 
-            canvas.DrawText("Folders", Padding, 32, titleFont, titlePaint);
+            canvas.DrawText("Folders", Padding, 32, SKTextAlign.Left, titleFont, titlePaint);
             if (IsFocused)
                 canvas.DrawRect(SKRect.Create(1, 1, width - 2, height - 2), focusPaint);
             else
@@ -118,7 +118,7 @@ namespace Photos.Desktop
 
             if (_rows.Count == 0)
             {
-                canvas.DrawText("No folders yet. Add a folder to the library.", Padding, HeaderHeight + 24, font, countPaint);
+                canvas.DrawText("No folders yet. Add a folder to the library.", Padding, HeaderHeight + 24, SKTextAlign.Left, font, countPaint);
                 return;
             }
 
@@ -157,10 +157,10 @@ namespace Photos.Desktop
                 float indent = Padding + depth * IndentStep;
                 if (_parents.Contains(row.Id))
                 {
-                    canvas.DrawText(_collapsed.Contains(row.Id) ? "+" : "-", indent, baseline, font, countPaint);
+                    canvas.DrawText(_collapsed.Contains(row.Id) ? "+" : "-", indent, baseline, SKTextAlign.Left, font, countPaint);
                     indent += IndentStep;
                 }
-                canvas.DrawText(name, indent, baseline, font, namePaint);
+                canvas.DrawText(name, indent, baseline, SKTextAlign.Left, font, namePaint);
 
                 // shown / total known images; the part that is not shown is drawn in colour
                 int shown = row.Count;
@@ -196,7 +196,7 @@ namespace Photos.Desktop
             for (int i = 0; i < _menuItems.Count; i++)
             {
                 float baseline = _menuY + 4 + i * RowHeight + RowHeight * 0.7f;
-                canvas.DrawText(_menuItems[i].Text, _menuX + 12, baseline, font, _menuItems[i].Run == null ? disabled : text);
+                canvas.DrawText(_menuItems[i].Text, _menuX + 12, baseline, SKTextAlign.Left, font, _menuItems[i].Run == null ? disabled : text);
             }
         }
 
@@ -278,6 +278,11 @@ namespace Photos.Desktop
 
         static bool IsInside(string dir, string parent) =>
             dir.Length > parent.Length && dir.StartsWith(parent, StringComparison.OrdinalIgnoreCase) && (dir[parent.Length] == '\\' || dir[parent.Length] == '/');
+
+        /// <summary>True when the folder is highlighted: its filter is on, or it is the deleted-images folder while that view is open.</summary>
+        bool IsSelectedFolder(FileFilter row) => _provider.TrashFolderIds.Contains(row.Id)
+            ? _provider.ShowDeleted
+            : _group != null && _provider.FilterService.IsFilterActive(_group, row);
 
         bool IsPrivateRow(string id) => PrivateFolderRules.IsPrivate(_provider.PrivateFolderIds, id);
 

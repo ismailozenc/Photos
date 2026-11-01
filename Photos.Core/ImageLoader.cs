@@ -132,7 +132,8 @@ namespace Photos.Core
 
             using var surface = new SKCanvas(rotated);
             surface.SetMatrix(m);
-            surface.DrawBitmap(bmp, 0, 0);
+            using (var source = SKImage.FromBitmap(bmp))
+                surface.DrawImage(source, 0, 0, BaseView.HighQualitySampling, null);
             surface.Flush();
 
             bmp.Dispose();

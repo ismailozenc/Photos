@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Photos.Core
 {
-    public class ArrayDict<T,Q> where T : class
+    public class ArrayDict<T,Q> where T : class where Q : notnull
     {
         private readonly Func<T, Q> _key;
         public int Length => count;
