@@ -23,6 +23,12 @@ namespace Photos.Desktop
     [SupportedOSPlatform("windows")]
     internal static class WinUtils
     {
+        [DllImport("user32.dll")]
+        static extern uint GetDoubleClickTime();
+
+        /// <summary>The Windows double-click time, in milliseconds.</summary>
+        public static int DoubleClickMs() => (int)GetDoubleClickTime();
+
         [DllImport("dwmapi.dll")]
         static extern int DwmEnableBlurBehindWindow(IntPtr hwnd, ref DWM_BLURBEHIND blurBehind);
 

@@ -17,7 +17,7 @@ namespace Photos.Desktop
     /// </summary>
     internal sealed class SlideshowWindow : GameWindow
     {
-        const int IntervalMs = 5000;
+        public int IntervalMs = 5000;
 
         readonly PhotoProvider _provider;
         readonly Stopwatch _timer = new Stopwatch();

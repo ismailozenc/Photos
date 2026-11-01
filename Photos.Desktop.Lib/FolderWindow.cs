@@ -102,8 +102,13 @@ namespace Photos.Desktop
             using var excludedPaint = new SKPaint { Color = SKColors.Gray, IsAntialias = true };
             using var font = new SKFont(SKTypeface.Default, 18);
             using var titleFont = new SKFont(SKTypeface.Default, 20);
+            using var focusPaint = new SKPaint { Color = SKColors.LightGreen, Style = SKPaintStyle.Stroke, StrokeWidth = 2, IsAntialias = true };
 
             canvas.DrawText("Folders", Padding, 32, titleFont, titlePaint);
+            if (IsFocused)
+                canvas.DrawRect(SKRect.Create(1, 1, width - 2, height - 2), focusPaint);
+            else
+                canvas.DrawText("click to use keys", width - Padding, 32, SKTextAlign.Right, font, countPaint);
 
             if (_rows.Count == 0)
             {

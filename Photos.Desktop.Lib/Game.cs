@@ -34,6 +34,8 @@ namespace Photos.Desktop
         MonitorLayout _monitors;
         bool _monitorsAutoStart = true;
         bool _layoutWasRunning;
+        MainView _mainView;
+        bool _slideshowHintShown;
         SKSurface skSurface;
 
         PhotoProvider photoProvider;
@@ -110,6 +112,8 @@ namespace Photos.Desktop
 
             DesktopImageLoader.Register();
             WinFormsDialogs.Register();
+            if (OperatingSystem.IsWindows())
+                Core.Utils.DoubleClickTimeMs = () => WinUtils.DoubleClickMs();
             Core.Utils.Log($"Displays detected: {string.Join(", ", ScreenDetection.GetDisplayBounds())}");
             photoProvider = providerPromise.Result;
             _slideshows = new SlideshowController(photoProvider, () => Context.MakeCurrent());
@@ -177,6 +181,7 @@ namespace Photos.Desktop
             }
 
             var mainView = new MainView(photoProvider);
+            _mainView = mainView;
             mainView.SlideshowRequested += StartSlideshowFromBrowse;
             mainView.BrowseShown += () => _monitors.ShowPreviewIfHidden();
 
@@ -366,6 +371,11 @@ namespace Photos.Desktop
             _layoutWasRunning = _monitors.IsRunning;
             _monitors.Stop();
             _slideshows.Start();
+            if (_slideshows.IsRunning && !_slideshowHintShown)
+            {
+                _slideshowHintShown = true;
+                _mainView?.MainToast.Show("Space pauses · Left and Right skip · Escape stops all screens", 4);
+            }
             if (!_slideshows.IsRunning && _layoutWasRunning)
             {
                 _layoutWasRunning = false;

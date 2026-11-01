@@ -44,6 +44,23 @@ namespace Photos.Core
                     OnClick = () => photoProvider.SetShowDeleted(!photoProvider.ShowDeleted),
                 });
 
+            if (photoProvider.ShowDeleted)
+            {
+                int copies = photoProvider.DeletedCopyCount;
+                menu.Items.Add(new()
+                {
+                    Text = $"Restore all ({copies})",
+                    OnClick = () => ShowDeletedResult(photoProvider.RestoreAllDeleted(), "Restored"),
+                    ReturnLevel = Menu.CloseMenuLevel,
+                });
+                menu.Items.Add(new()
+                {
+                    Text = "Empty deleted images",
+                    Submenu = m => Menu.Confirm(m, $"Permanently delete {copies} images", () =>
+                        MainToast.Show($"Deleted {photoProvider.EmptyDeleted()} images"), new[] { "This cannot be undone" }),
+                });
+            }
+
             if (photoProvider.HasPrivateFolders)
                 menu.Items.Add(new()
                 {
@@ -75,6 +92,12 @@ namespace Photos.Core
                     new[] { "Use this option to refresh existing thumbnails", "All photos will be reindexed", "It can take some time!" })
                 });
 
+            menu.Items.Add(new()
+            {
+                Text = $"Slideshow interval: {photoProvider.DB.Settings.SlideshowIntervalMs / 1000} s",
+                OnClick = () => photoProvider.DB.UpdateSettings(s => s with { SlideshowIntervalSec = NextSlideshowInterval(s.SlideshowIntervalMs / 1000) }),
+            });
+
             OnBuildPlatformSpecifiMenu?.Invoke(MenuSection.Settings, menu);
 
             menu.Items.Add(new()
@@ -83,6 +106,8 @@ namespace Photos.Core
                 OnClick = () => photoProvider.DB.UpdateSettings(s => s with { DevMode = !s.DevMode })
             });
         }
+
+        static int NextSlideshowInterval(int seconds) => seconds switch { 3 => 5, 5 => 10, 10 => 30, _ => 3 };
 
         void ToggleLockPrivate()
         {
@@ -189,6 +214,9 @@ namespace Photos.Core
                 items.Add(new MenuItem() { Text = $"{verb} a copy", Submenu = s => s.Items.AddRange(copyEntries) });
             }
         }
+
+        void ShowDeletedResult((int done, int failed, string lastError) result, string success) =>
+            MainToast.Show(result.failed == 0 ? $"{success}: {result.done}" : $"{result.done} done, {result.failed} failed: {result.lastError}");
 
         void RunOnCopies(List<FileRecord> files, bool restoring)
         {

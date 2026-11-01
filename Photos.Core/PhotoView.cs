@@ -470,7 +470,6 @@ namespace Photos.Core
 
         bool _slideshow;
         readonly Stopwatch _slideshowTimer = new();
-        const int SlideshowIntervalMs = 5000;
 
         private void ToggleSlideshow()
         {
@@ -485,12 +484,12 @@ namespace Photos.Core
             InfoToast.Show(_slideshow ? "Slideshow on (S to stop)" : "Slideshow off", 2);
         }
 
-        /// <summary>Advances to the next photo every <see cref="SlideshowIntervalMs"/> while the slideshow is on.</summary>
+        /// <summary>Advances to the next photo every slideshow interval while the slideshow is on.</summary>
         private void TickSlideshow()
         {
             if (!_slideshow || !Enabled)
                 return;
-            if (_slideshowTimer.ElapsedMilliseconds < SlideshowIntervalMs)
+            if (_slideshowTimer.ElapsedMilliseconds < photoProvider.DB.Settings.SlideshowIntervalMs)
                 return;
 
             _slideshowTimer.Restart();

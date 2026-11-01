@@ -16,6 +16,8 @@ namespace Photos.Core
         public const string LatinAppName = "uPhotos";
 
         public static Func<bool> TraceEnabled;
+        /// <summary>Double-click time in milliseconds; set by the Windows host from the system setting.</summary>
+        public static Func<int> DoubleClickTimeMs = () => 450;
 
         static Utils()
         {

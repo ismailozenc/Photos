@@ -524,6 +524,43 @@ namespace Photos.Core
             }
         }
 
+        /// <summary>Copies currently in deleted-images folders.</summary>
+        public int DeletedCopyCount => DB.ListFiles().Sum(f => f.Src.Count(IsTrashedSource));
+
+        /// <summary>Restores every deleted copy to its original folder.</summary>
+        public (int done, int failed, string lastError) RestoreAllDeleted() =>
+            RunTrashBatch(DB.ListFiles().SelectMany(f => Enumerable.Range(0, f.Src.Length)
+                .Where(i => IsTrashedSource(f.Src[i])).Select(i => (f, i))).ToList(), restore: true);
+
+        /// <summary>
+        /// Permanently deletes every copy in the deleted-images folders. Entries whose file could not be deleted are kept.
+        /// A rescan then removes the deleted copies from the library.
+        /// </summary>
+        public int EmptyDeleted()
+        {
+            int deleted = 0;
+            foreach (var f in DB.ListFiles())
+                for (int i = 0; i < f.Src.Length; i++)
+                    if (IsTrashedSource(f.Src[i]))
+                    {
+                        var path = DB.Directories.GetValue(f.Src[i].D).CombinePath(f.Src[i]);
+                        try
+                        {
+                            File.Delete(path);
+                            deleted++;
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.LogError(ex);
+                        }
+                    }
+
+            DB.UpdateSettings(s => s with { DeletedOriginals = (s.DeletedOriginals ?? Array.Empty<string>()).Where(x => File.Exists(x.Split('|')[0])).ToArray() });
+            _deletedMap = null;
+            UpdateLibraryMaybe(new IndexTaskConfig() { DoneMessage = "deleted images removed" });
+            return deleted;
+        }
+
         /// <summary>
         /// Moves each copy into its library's deleted-images folder, or back to its original folder when restoring.
         /// The whole batch costs one settings save and one index save. Returns the counts and the last error.

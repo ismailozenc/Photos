@@ -136,7 +136,7 @@ namespace Photos.Core
                             SelectedItems.Add(imgIndex);
                         return;
                     }
-                    bool isDoubleClick = imgIndex == _lastClickIdx && (DateTime.UtcNow - _lastClickUtc).TotalMilliseconds < DoubleClickMs;
+                    bool isDoubleClick = imgIndex == _lastClickIdx && (DateTime.UtcNow - _lastClickUtc).TotalMilliseconds < Utils.DoubleClickTimeMs();
                     _lastClickIdx = isDoubleClick ? -1 : imgIndex;
                     _lastClickUtc = DateTime.UtcNow;
                     photoProvider.Idx = imgIndex;
@@ -165,7 +165,6 @@ namespace Photos.Core
             _dateTimeFormat = _dateTimeFormat.Replace("dddd", "").Replace("dddd", "").Trim(',').Trim();
         }
         public event Action<int> ItemContextRequested;
-        const int DoubleClickMs = 450;
         int _lastClickIdx = -1;
         DateTime _lastClickUtc;
         int minImgIdx, maxImgIdx;
