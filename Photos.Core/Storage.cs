@@ -106,13 +106,24 @@ namespace Photos.Core
         }
 
         public event Action<SettingsRecord, SettingsRecord> OnSettingsUpdate;
+        readonly object _settingsLock = new object();
+
         public SettingsRecord Settings
         {
             get => settings;
-            set
+            set => UpdateSettings(_ => value);
+        }
+
+        /// <summary>
+        /// The only way to change settings from more than one thread: the change is applied to the current
+        /// value under a lock, so two writers cannot overwrite each other.
+        /// </summary>
+        public void UpdateSettings(Func<SettingsRecord, SettingsRecord> change)
+        {
+            lock (_settingsLock)
             {
                 var old = settings;
-                settings = value;
+                settings = change(old);
                 OnSettingsUpdate?.Invoke(old, settings);
                 SaveSettings();
             }

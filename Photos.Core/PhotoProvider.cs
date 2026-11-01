@@ -107,6 +107,7 @@ namespace Photos.Core
             Indexer = new PhotoIndexer(DB, protectUnreadableFolders, Path.Combine(editorDir, Utils.LatinAppName));
 
             FilterService = new(DB);
+            PruneDeletedOriginals();
             FilterService.FilterUpdate += () => EnqueueRefreshDisplayOrder(true);
 
             Indexer.IndexUpdateRequest += () => {
@@ -253,21 +254,30 @@ namespace Photos.Core
         //const int WorkStatusDelay = 1000;
         public event Action OnDisplayOrderUpdate;
 
+        /// <summary>Drops deleted-image entries whose trashed file no longer exists, e.g. removed or moved outside the app.</summary>
+        void PruneDeletedOriginals()
+        {
+            var entries = DB.Settings.DeletedOriginals ?? Array.Empty<string>();
+            var kept = entries.Where(x => File.Exists(x.Split('|')[0])).ToArray();
+            if (kept.Length == entries.Length)
+                return;
+            DB.UpdateSettings(s => s with { DeletedOriginals = kept });
+            _deletedMap = null;
+        }
+
         public IReadOnlyList<string> GetDirs() => DB.Settings.Dirs;
         public void AddDir(string path)
         {
             if (DB.Settings.Dirs.Contains(path))
                 return;
 
-            DB.Settings.Dirs = DB.Settings.Dirs.AddToArr(path);
-            DB.SaveSettings();
+            DB.UpdateSettings(s => s with { Dirs = s.Dirs.AddToArr(path) });
 
             RestartBackgroundTasks(null, new IndexTaskConfig() { ForceRefreshDisplayAfterIndex = true });
         }
         public void RemoveDir(string d)
         {
-            DB.Settings.Dirs = DB.Settings.Dirs.Where(x => x != d).ToArray();
-            DB.SaveSettings();
+            DB.UpdateSettings(s => s with { Dirs = s.Dirs.Where(x => x != d).ToArray() });
 
             EnqueueRefreshDisplayOrder();
             RestartBackgroundTasks(null);
@@ -415,11 +425,14 @@ namespace Photos.Core
         public void SetFoldersExcluded(IEnumerable<string> folderIds, bool excluded)
         {
             var changed = folderIds.ToList();
-            var ids = (DB.Settings.ExcludedFolders ?? Array.Empty<string>())
-                .Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
-            if (excluded)
-                ids.AddRange(changed);
-            DB.Settings = DB.Settings with { ExcludedFolders = ids.ToArray() };
+            DB.UpdateSettings(s =>
+            {
+                var ids = (s.ExcludedFolders ?? Array.Empty<string>())
+                    .Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
+                if (excluded)
+                    ids.AddRange(changed);
+                return s with { ExcludedFolders = ids.ToArray() };
+            });
             EnqueueRefreshDisplayOrder();
         }
 
@@ -501,9 +514,12 @@ namespace Photos.Core
 
             if (done > 0)
             {
-                var kept = (DB.Settings.DeletedOriginals ?? Array.Empty<string>())
-                    .Where(x => !removed.Any(r => x.StartsWith(r + "|", StringComparison.OrdinalIgnoreCase)));
-                DB.Settings = DB.Settings with { DeletedOriginals = kept.Concat(added).ToArray() };
+                DB.UpdateSettings(s => s with
+                {
+                    DeletedOriginals = (s.DeletedOriginals ?? Array.Empty<string>())
+                        .Where(x => !removed.Any(r => x.StartsWith(r + "|", StringComparison.OrdinalIgnoreCase)))
+                        .Concat(added).ToArray()
+                });
                 _deletedMap = null;
                 DB.SaveFiles();
             }
@@ -639,10 +655,14 @@ namespace Photos.Core
         public void SetFoldersPrivate(IEnumerable<string> folderIds, bool isPrivate)
         {
             var changed = folderIds.ToList();
-            var ids = PrivateFolderIds.Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
-            if (isPrivate)
-                ids.AddRange(changed);
-            DB.Settings = DB.Settings with { PrivateFolders = ids.ToArray() };
+            DB.UpdateSettings(s =>
+            {
+                var ids = (s.PrivateFolders ?? Array.Empty<string>())
+                    .Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
+                if (isPrivate)
+                    ids.AddRange(changed);
+                return s with { PrivateFolders = ids.ToArray() };
+            });
             EnqueueRefreshDisplayOrder();
         }
 

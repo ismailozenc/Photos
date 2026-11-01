@@ -138,7 +138,10 @@ namespace Photos.Desktop
                 bool excluded = _provider.IsExcludedFolder(row.Id);
                 if (excluded)
                     name += " (hidden)";
-                var namePaint = isPrivate ? privatePaint : excluded ? excludedPaint : active ? activePaint : textPaint;
+                bool allHidden = row.Count == 0 && !_provider.TrashFolderIds.Contains(row.Id);
+                if (allHidden)
+                    name += " (all hidden)";
+                var namePaint = isPrivate ? privatePaint : excluded || allHidden ? excludedPaint : active ? activePaint : textPaint;
                 canvas.DrawText(name, Padding + depth * IndentStep, baseline, font, namePaint);
 
                 // shown / total known images; the part that is not shown is drawn in colour
@@ -264,6 +267,8 @@ namespace Photos.Desktop
             }
             if (_group == null || index < 0 || index >= _rows.Count)
                 return;
+            if (_rows[index].Count == 0)
+                return; // every photo in this folder is hidden, so there is nothing to show
             _provider.FilterService.ToggleFilters(_group, _rows[index]);
         }
 

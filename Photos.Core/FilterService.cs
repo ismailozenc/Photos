@@ -35,21 +35,11 @@ namespace Photos.Core
             mode++;
             mode = (SortModeEnum)((int)mode % Enum.GetValues<SortModeEnum>().Length);
 
-            ActiveSettings = ActiveSettings with { StoredSortMode = mode };
+            UpdateActive(s => s with { StoredSortMode = mode });
             FilterUpdate?.Invoke();
         }
 
-        SettingsRecord ActiveSettings
-        {
-            get => PersistentFilters ? DB.Settings : volatileSettingsRecord;
-            set
-            {
-                if (PersistentFilters) 
-                    DB.Settings = value;
-                else
-                    volatileSettingsRecord = value;
-            }
-        }
+        SettingsRecord ActiveSettings => PersistentFilters ? DB.Settings : volatileSettingsRecord;
 
         bool _persistentFilters;
         internal event Action FilterUpdate;
@@ -236,26 +226,36 @@ namespace Photos.Core
 
             if (purgeMissing)
             {
-                var setting = ActiveSettings;
-
-                foreach (var fg in ActiveSettings.Filters)
-                    foreach (var item in fg.Value.Selected)
-                        if (!_filterLookup.TryGetValue(fg.Key, out var fgDict) || !fgDict.Filters.ContainsKey(item))
-                            setting = ToggleFilter(fg.Key, item, setting);
-
-                if (setting != ActiveSettings)
-                    ActiveSettings = setting;
+                UpdateActive(current =>
+                {
+                    var setting = current;
+                    foreach (var fg in current.Filters)
+                        foreach (var item in fg.Value.Selected)
+                            if (!_filterLookup.TryGetValue(fg.Key, out var fgDict) || !fgDict.Filters.ContainsKey(item))
+                                setting = ToggleFilter(fg.Key, item, setting);
+                    return setting;
+                });
             }
 
         }
        
+        /// <summary>Applies a change to the active settings: the saved settings when filters persist, otherwise the volatile copy.</summary>
+        void UpdateActive(Func<SettingsRecord, SettingsRecord> change)
+        {
+            if (PersistentFilters)
+                DB.UpdateSettings(change);
+            else
+                volatileSettingsRecord = change(volatileSettingsRecord);
+        }
+
         public void ToggleFilters(FileFilterGroup gr, params FileFilter[] filters)
         {
-            var settings = ActiveSettings;
-
-            foreach (var item in filters)
-                settings = ToggleFilter(gr.GroupId, item.Id, settings);
-            ActiveSettings = settings;
+            UpdateActive(settings =>
+            {
+                foreach (var item in filters)
+                    settings = ToggleFilter(gr.GroupId, item.Id, settings);
+                return settings;
+            });
             FilterUpdate?.Invoke();
         }
 

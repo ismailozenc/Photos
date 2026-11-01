@@ -207,8 +207,7 @@ namespace Photos.Desktop
                                 Text = $"Window background: {(photoProvider.DB.Settings.IsOpaqueBackground ? "opaque" : "transparent")}",
                                 OnClick = () =>
                                 {
-                                    photoProvider.DB.Settings.IsOpaqueBackground = !photoProvider.DB.Settings.IsOpaqueBackground;
-                                    photoProvider.DB.SaveSettings();
+                                    photoProvider.DB.UpdateSettings(s => s with { IsOpaqueBackground = !s.IsOpaqueBackground });
                                 }
                             });
                     }

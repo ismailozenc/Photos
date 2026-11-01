@@ -4,13 +4,13 @@ Nov 1, 2026 · @ismail özenç
 
 ## Summary
 
-The breaking indexing bug is fixed: GPS photos failed to index once `cities.csv` was removed, and all GPS handling is now gone. Bugs 2 to 6 are fixed as well; bugs 7 to 9 remain open.
+The breaking indexing bug is fixed: GPS photos failed to index once `cities.csv` was removed, and all GPS handling is now gone. Bugs 2 to 9 are all fixed.
 
 Reviewed at commit `0687b1e` ("csv removed"): 72 tracked files, 46 C# files, about 13,000 lines. The repo has no tests and has not been compiled in this review, so line numbers are from source reading only.
 
 | Area | Count | Most important |
 | --- | --- | --- |
-| Errors and likely bugs | 3 open of 9 | Stale deleted-image entries, hidden-only folder rows, settings writes that can race |
+| Errors and likely bugs | 0 open of 9 | All fixed; a dialog failure and a failed image decode are now logged |
 | Code quality and performance | 8 | Full-image decode on the render thread |
 | User experience | 10 | Slideshow Escape closes one screen only |
 | Feature upgrades | 12 | Shift-click range select, Empty deleted images |
@@ -28,9 +28,9 @@ The first two rows break or leak data today; fix them first.
 | 4 | Resolved | `PreviewWindow.cs:54`, `SlideshowWindow.cs:106` | Full images are read and decoded on the main render thread. Each preview click or slide change freezes every window for the decode time. | Decode on a background task; show the previous image or the thumbnail until ready. |
 | 5 | Resolved | `WinFormsDialogs.cs:30`, `:63` | Dialogs block the render thread with `thread.Join()`. While a dialog is open no window redraws, which can leave secondary monitors black. | Keep rendering while the dialog runs; poll for its result each frame. |
 | 6 | Resolved | `SlideshowWindow.cs:151` | Escape closes only the focused screen; the other screens keep running and the folder/preview windows only return when all are closed. | Escape on any screen stops the whole slideshow. |
-| 7 | Low | `PhotoProvider.cs:495`, `:530` | `DeletedOriginals` is never pruned. Files removed or moved outside the app leave stale entries, and the deleted-images row can stay visible with nothing in it. | Prune entries whose trashed file no longer exists, at startup. |
-| 8 | Low | `FilterService.cs:182` | Folder rows with only hidden photos are kept. Clicking one shows an empty grid. | Mark such rows as hidden-only, or skip them in the filter. |
-| 9 | Low | `DB.Settings = DB.Settings with {…}` (many places) | Read-modify-write of settings from the UI thread and background tasks can drop a change (last write wins). | Add a single `UpdateSettings(Func<SettingsRecord, SettingsRecord>)` with a lock. |
+| 7 | Resolved | `PhotoProvider.cs:495`, `:530` | `DeletedOriginals` is never pruned. Files removed or moved outside the app leave stale entries, and the deleted-images row can stay visible with nothing in it. | Prune entries whose trashed file no longer exists, at startup. |
+| 8 | Resolved | `FilterService.cs:182` | Folder rows with only hidden photos are kept. Clicking one shows an empty grid. | Mark such rows as hidden-only, or skip them in the filter. |
+| 9 | Resolved | `DB.Settings = DB.Settings with {…}` (many places) | Read-modify-write of settings from the UI thread and background tasks can drop a change (last write wins). | Add a single `UpdateSettings(Func<SettingsRecord, SettingsRecord>)` with a lock. |
 
 ## Code quality and performance
 

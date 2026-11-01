@@ -80,7 +80,7 @@ namespace Photos.Core
             menu.Items.Add(new()
             {
                 Text = $"Debug mode: {(photoProvider.DB.Settings.DevMode ? "ON" : "OFF")}",
-                OnClick = () => photoProvider.DB.Settings = photoProvider.DB.Settings with { DevMode = !photoProvider.DB.Settings.DevMode }
+                OnClick = () => photoProvider.DB.UpdateSettings(s => s with { DevMode = !s.DevMode })
             });
         }
 
@@ -305,7 +305,7 @@ namespace Photos.Core
             menu.Items.AddRange(Enumerable.Range(0, ThumbnailSizes.Sizes.Length).Select(i => new MenuItem()
             {
                 Text = $"{ThumbnailSizes.Names[i]} ({ThumbnailSizes.Sizes[i]}px)",
-                OnClick = () => photoProvider.DB.Settings = photoProvider.DB.Settings with { ThumbnailDrawSize = ThumbnailSizes.Sizes[i] },
+                OnClick = () => photoProvider.DB.UpdateSettings(s => s with { ThumbnailDrawSize = ThumbnailSizes.Sizes[i] }),
                 Selected = () => ThumbnailSizes.SlotFor(photoProvider.DB.Settings.ThumbnailDrawSize) == i,
             }));
         }

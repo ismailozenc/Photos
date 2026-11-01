@@ -47,6 +47,10 @@ namespace Photos.Desktop
                     Current?.Dispose();
                     Current = done.Result;
                 }
+                else if (done.Exception != null)
+                {
+                    Core.Utils.LogError(done.Exception); // the image is left out, but the failure is recorded
+                }
             }
         }
 
