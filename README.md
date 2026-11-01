@@ -40,7 +40,7 @@ Private folders only hide photos in the app's own views; anyone with access to t
 
 - **Password in source.** `PrivateFolderRules.cs:14` holds `"1234"` as a constant. Store a salted hash (PBKDF2) in settings and add a "Change password" item.
 - **Thumbnails on disk.** Private photos' thumbnails sit unencrypted in `large.bin` and `tiny.bin`, and the files stay readable in Explorer. Say so in the UI, or encrypt the private thumbnails.
-- **Packages.** Magick.NET 14.15.0 and MessagePack 3.1.9 were flagged as vulnerable by NuGet earlier in this work. Run `dotnet list package --vulnerable` and update.
+- **Packages.** Checked against published advisories: MessagePack 3.1.12, Magick.NET-Q8 15.0.0 and SkiaSharp 4.154.0 are past the fixed versions. Transitive and test packages are not checked. Confirm with `dotnet list package --vulnerable --include-transitive` on Windows.
 - **README.** It describes features this fork removed: mobile sync, country/city/camera filters and the project website. Rewrite it for the fork's features.
 - **Repo name.** `git push` reports the repository moved to `ismailozenc/Photos`; update the `origin` URL.
 
