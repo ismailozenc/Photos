@@ -160,7 +160,7 @@ namespace Photos.Core
         }
 
         /// <summary>Points one source of a file at another directory and file name, e.g. after a move.</summary>
-        internal void ReplaceSource(FileRecord file, int srcIndex, int dirIdx, string fileName)
+        internal void ReplaceSource(FileRecord file, int srcIndex, int dirIdx, string fileName, bool save = true)
         {
             var current = Current(file);
             var src = (SourceRecord[])current.Src.Clone();
@@ -168,7 +168,8 @@ namespace Photos.Core
             lock (_files)
                 UpdateInternal(FileRecord.Clone(current, src), current);
             IsDirty = true;
-            SaveFiles();
+            if (save)
+                SaveFiles();
         }
 
         public Storage(string path)

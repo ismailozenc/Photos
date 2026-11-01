@@ -22,6 +22,11 @@ namespace Photos.Desktop
 
         public bool IsRunning => _windows.Count > 0;
 
+        bool _stopRequested;
+
+        /// <summary>Stops every screen on the next frame. Escape on any screen calls this, so no window is closed from inside its own event.</summary>
+        public void RequestStop() => _stopRequested = true;
+
         /// <summary>Raised when the last slideshow window closes on its own (not via Stop).</summary>
         public event Action Finished;
 
@@ -29,6 +34,7 @@ namespace Photos.Desktop
         {
             if (IsRunning)
                 return;
+            _stopRequested = false;
             if (_provider.DisplayedCount == 0)
             {
                 Core.Utils.Log("Screen slideshow: no photos to show");
@@ -43,6 +49,7 @@ namespace Photos.Desktop
                 {
                     var d = displays[i];
                     var window = new SlideshowWindow(_provider, d.X, d.Y, d.Width, d.Height, starts[i]);
+                    window.OnEscape = RequestStop;
                     _windows.Add(window); // added first, so Stop disposes it if Initialize fails
                     window.Initialize();
                 }
@@ -82,6 +89,14 @@ namespace Photos.Desktop
         /// <summary>Draws every slideshow window. Called once per frame of the main window.</summary>
         public void Tick()
         {
+            if (_stopRequested)
+            {
+                _stopRequested = false;
+                Stop();
+                Finished?.Invoke();
+                return;
+            }
+
             bool hadWindows = _windows.Count > 0;
             for (int i = _windows.Count - 1; i >= 0; i--)
             {

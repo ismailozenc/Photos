@@ -314,7 +314,7 @@ namespace Photos.Core
                 if (!skipFilters)
                     FilterService.RefreshFilters(files, dirs.Where(x => x != null), initTask != null);
 
-                files = files.Where(f => !IsPrivateHidden(f) && (ShowDeleted ? HasTrashedSource(f) : !IsFullyTrashed(f) && !IsFullyExcluded(f))).ToList(); // private, hidden folders and the open view
+                files = files.Where(f => ShowDeleted ? !IsPrivateHidden(f) && HasTrashedSource(f) : IsInLibrary(f)).ToList(); // the open view: deleted images, or the library
                 FilterService.FilterFiles(files);
 
                 if (FilterService.CurrentSortMode == SortModeEnum.Filename)
@@ -389,6 +389,9 @@ namespace Photos.Core
                 return null;
             }
         }
+
+        /// <summary>The library's rule for showing a photo: not private while locked, not moved to deleted images, not in a hidden folder.</summary>
+        public bool IsInLibrary(FileRecord file) => !IsPrivateHidden(file) && !IsFullyTrashed(file) && !IsFullyExcluded(file);
 
         /// <summary>True when the folder itself is hidden from browse and slideshows (subfolders are not affected).</summary>
         public bool IsExcludedFolder(string folderId) =>
@@ -469,8 +472,51 @@ namespace Photos.Core
             }
         }
 
-        /// <summary>Moves a local photo into its library's deleted-images folder. Nothing is overwritten.</summary>
-        public string MoveToDeleted(FileRecord file, int srcIndex, bool refresh = true)
+        /// <summary>
+        /// Moves each copy into its library's deleted-images folder, or back to its original folder when restoring.
+        /// The whole batch costs one settings save and one index save. Returns the counts and the last error.
+        /// </summary>
+        public (int done, int failed, string lastError) RunTrashBatch(IEnumerable<(FileRecord file, int srcIndex)> items, bool restore)
+        {
+            var added = new List<string>();
+            var removed = new List<string>();
+            var moved = new List<FileRecord>();
+            int done = 0, failed = 0;
+            string lastError = null;
+
+            foreach (var (file, srcIndex) in items.ToList())
+            {
+                var error = restore ? RestoreOne(file, srcIndex, removed) : TrashOne(file, srcIndex, added);
+                if (error == null)
+                {
+                    done++;
+                    moved.Add(file);
+                }
+                else
+                {
+                    failed++;
+                    lastError = error;
+                }
+            }
+
+            if (done > 0)
+            {
+                var kept = (DB.Settings.DeletedOriginals ?? Array.Empty<string>())
+                    .Where(x => !removed.Any(r => x.StartsWith(r + "|", StringComparison.OrdinalIgnoreCase)));
+                DB.Settings = DB.Settings with { DeletedOriginals = kept.Concat(added).ToArray() };
+                _deletedMap = null;
+                DB.SaveFiles();
+            }
+
+            if (IsSingleFolderMode && !restore && done > 0)
+                lock (_lock)
+                    _folderViewList = _folderViewList.Where(x => !moved.Contains(x)).ToList();
+
+            EnqueueRefreshDisplayOrder();
+            return (done, failed, lastError);
+        }
+
+        string TrashOne(FileRecord file, int srcIndex, List<string> added)
         {
             file = DB.Current(file);
             var src = file.Src[srcIndex];
@@ -492,20 +538,12 @@ namespace Photos.Core
             }
 
             var trashDirIdx = DB.Directories.GetIndex(new DirectoryRecord() { Directory = trashDir, SourceId = 0 });
-            DB.Settings = DB.Settings with { DeletedOriginals = (DB.Settings.DeletedOriginals ?? Array.Empty<string>()).Append($"{target}|{fullPath}").ToArray() };
-            _deletedMap = null;
-            DB.ReplaceSource(file, srcIndex, trashDirIdx, Path.GetFileName(target));
-
-            if (IsSingleFolderMode)
-                lock (_lock)
-                    _folderViewList = _folderViewList.Where(x => x != file).ToList();
-            if (refresh)
-                EnqueueRefreshDisplayOrder();
+            added.Add($"{target}|{fullPath}");
+            DB.ReplaceSource(file, srcIndex, trashDirIdx, Path.GetFileName(target), save: false);
             return null;
         }
 
-        /// <summary>Moves a deleted photo back to the folder it came from. A name clash gets a new name.</summary>
-        public string RestoreFromDeleted(FileRecord file, int srcIndex, bool refresh = true)
+        string RestoreOne(FileRecord file, int srcIndex, List<string> removed)
         {
             file = DB.Current(file);
             var src = file.Src[srcIndex];
@@ -520,20 +558,24 @@ namespace Photos.Core
                 var target = UniquePath(originalDir, Path.GetFileName(original));
                 File.Move(trashed, target);
                 var originalDirIdx = DB.Directories.GetIndex(new DirectoryRecord() { Directory = originalDir, SourceId = 0 });
-                DB.ReplaceSource(file, srcIndex, originalDirIdx, Path.GetFileName(target));
+                DB.ReplaceSource(file, srcIndex, originalDirIdx, Path.GetFileName(target), save: false);
             }
             catch (Exception ex)
             {
                 return ex.Message;
             }
 
-            DB.Settings = DB.Settings with { DeletedOriginals = (DB.Settings.DeletedOriginals ?? Array.Empty<string>())
-                .Where(x => !x.StartsWith(trashed + "|", StringComparison.OrdinalIgnoreCase)).ToArray() };
-            _deletedMap = null;
-            if (refresh)
-                EnqueueRefreshDisplayOrder();
+            removed.Add(trashed);
             return null;
         }
+
+        /// <summary>Moves a local photo into its library's deleted-images folder. Nothing is overwritten.</summary>
+        public string MoveToDeleted(FileRecord file, int srcIndex) =>
+            RunTrashBatch(new[] { (file, srcIndex) }, restore: false).lastError;
+
+        /// <summary>Moves a deleted photo back to the folder it came from. A name clash gets a new name.</summary>
+        public string RestoreFromDeleted(FileRecord file, int srcIndex) =>
+            RunTrashBatch(new[] { (file, srcIndex) }, restore: true).lastError;
 
         /// <summary>The added library folder that contains the file, or the file's own folder if none does.</summary>
         string LibraryRootOf(string fullPath)

@@ -27,6 +27,9 @@ namespace Photos.Desktop
         SKImage _image;
         int _index;
         bool _paused;
+        readonly AsyncImage _loader = new AsyncImage();
+        /// <summary>Set by the controller: Escape on any screen stops every screen.</summary>
+        public Action OnEscape;
 
         public SlideshowWindow(PhotoProvider provider, int x, int y, int width, int height, int startIndex)
             : base(GameWindowSettings.Default, new NativeWindowSettings
@@ -72,6 +75,9 @@ namespace Photos.Desktop
             if (!_paused && _timer.ElapsedMilliseconds >= IntervalMs)
                 Step(1);
 
+            _loader.Poll();
+            _image = _loader.Current;
+
             // Present every tick: the OS can discard a window's contents, which would leave it
             // blank until the next photo change.
             Draw();
@@ -92,24 +98,20 @@ namespace Photos.Desktop
 
         void LoadCurrent()
         {
-            _image?.Dispose();
-            _image = null;
-
             int count = _provider.DisplayedCount;
-            if (count == 0)
-                return;
-
-            var file = _provider.GetFile(_index % count);
-            if (file == null)
-                return;
-
-            using var data = _provider.Indexer.GetFullImage(file);
-            if (data == null)
-                return;
-
+            var file = count == 0 ? null : _provider.GetFile(_index % count);
+            var data = file == null ? null : _provider.Indexer.GetFullImage(file); // the file is read here; decoding happens off this thread
             int side = Math.Min(ClientSize.X, ClientSize.Y);
-            ImageLoader.DecodeAndResizeImage(data, ImageLoader.ScaleToMinSide(side, side));
-            _image = data.Bitmap == null ? null : SKImage.FromBitmap(data.Bitmap);
+            _loader.Request(() =>
+            {
+                if (data == null)
+                    return null;
+                using (data)
+                {
+                    ImageLoader.DecodeAndResizeImage(data, ImageLoader.ScaleToMinSide(side, side));
+                    return data.Bitmap == null ? null : SKImage.FromBitmap(data.Bitmap);
+                }
+            });
         }
 
         void Draw()
@@ -149,7 +151,10 @@ namespace Photos.Desktop
             switch (e.Key)
             {
                 case Keys.Escape:
-                    Close();
+                    if (OnEscape != null)
+                        OnEscape();
+                    else
+                        Close();
                     break;
                 case Keys.Space:
                     _paused = !_paused;
@@ -169,7 +174,7 @@ namespace Photos.Desktop
             if (_skiaCtx != null)
             {
                 Context.MakeCurrent();
-                _image?.Dispose();
+                _loader.Dispose();
                 _surface?.Dispose();
                 _skiaCtx.Dispose();
             }

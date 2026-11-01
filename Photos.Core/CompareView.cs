@@ -55,7 +55,7 @@ namespace Photos.Core
         }
 
         ulong[] LiveSignatures() => photoProvider.DB.ListFiles()
-            .Where(f => f.IsIndexed())
+            .Where(f => f.IsIndexed() && photoProvider.IsInLibrary(f))
             .Select(f => f.Sig)
             .ToArray();
 

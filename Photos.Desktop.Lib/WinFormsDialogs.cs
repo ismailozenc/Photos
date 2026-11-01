@@ -19,16 +19,20 @@ namespace Photos.Desktop
             Photos.Lib.NativeDialogs.PasswordPrompt = ShowPasswordPrompt;
         }
 
-
-        static string ShowPasswordPrompt(string title)
+        /// <summary>
+        /// Runs a WinForms dialog on its own single-threaded apartment thread, so the render thread keeps drawing.
+        /// The result goes to onDone on that thread; callers hand it back to the render thread.
+        /// </summary>
+        static void RunOnStaThread<T>(Func<T> show, Action<T> onDone)
         {
-            // Same threading as the message boxes: a single-threaded apartment on its own thread.
-            string result = null;
-            var thread = new Thread(() => result = ShowPasswordForm(title));
+            var thread = new Thread(() => onDone(show())) { IsBackground = true };
             thread.SetApartmentState(ApartmentState.STA);
             thread.Start();
-            thread.Join();
-            return result;
+        }
+
+        static void ShowPasswordPrompt(string title, Action<string> done)
+        {
+            RunOnStaThread(() => ShowPasswordForm(title), result => Photos.Lib.NativeDialogs.Post(() => done(result)));
         }
 
         static string ShowPasswordForm(string title)
@@ -54,15 +58,12 @@ namespace Photos.Desktop
 
         static bool Show(string[] text, Photos.Lib.MessageBoxButton[] options)
         {
-            // WinForms needs a single-threaded apartment, and the render thread is not one.
-            // The form runs on its own STA thread and the chosen action runs on the caller's thread.
-            Action chosen = null;
-            var thread = new Thread(() => chosen = ShowForm(text, options));
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-
-            chosen?.Invoke();
+            // The chosen button's action runs on the render thread once the form has closed.
+            RunOnStaThread(() => ShowForm(text, options), chosen =>
+            {
+                if (chosen != null)
+                    Photos.Lib.NativeDialogs.Post(chosen);
+            });
             return true;
         }
 

@@ -91,11 +91,13 @@ namespace Photos.Core
                 photoProvider.LockPrivate();
                 return;
             }
-            var password = NativeDialogs.PasswordPrompt?.Invoke("Enter password for private folders");
-            if (password == null)
-                return; // cancelled, or no password prompt on this platform
-            if (!photoProvider.TryUnlockPrivate(password))
-                MainToast.Show("Wrong password");
+            NativeDialogs.PasswordPrompt?.Invoke("Enter password for private folders", password =>
+            {
+                if (password == null)
+                    return; // cancelled
+                if (!photoProvider.TryUnlockPrivate(password))
+                    MainToast.Show("Wrong password");
+            });
         }
 
         /// <summary>Right-click menu for thumbnails in browse mode. It works on the selection when the photo is selected.</summary>
@@ -190,24 +192,8 @@ namespace Photos.Core
 
         void RunOnCopies(List<FileRecord> files, bool restoring)
         {
-            int done = 0, failed = 0;
-            string lastError = null;
-            foreach (var file in files)
-                foreach (var index in photoProvider.ActionableSources(file).ToList())
-                {
-                    var error = restoring
-                        ? photoProvider.RestoreFromDeleted(file, index, refresh: false)
-                        : photoProvider.MoveToDeleted(file, index, refresh: false);
-                    if (error == null)
-                        done++;
-                    else
-                    {
-                        failed++;
-                        lastError = error;
-                    }
-                }
-
-            photoProvider.EnqueueRefreshDisplayOrder();
+            var items = files.SelectMany(f => photoProvider.ActionableSources(f).Select(i => (f, i))).ToList();
+            var (done, failed, lastError) = photoProvider.RunTrashBatch(items, restoring);
             string success = restoring ? "Restored" : "Moved to deleted images";
             MainToast.Show(failed == 0 ? $"{success}: {done}" : $"{done} done, {failed} failed: {lastError}");
         }

@@ -384,6 +384,7 @@ namespace Photos.Desktop
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
+            NativeDialogs.RunPending();
             if (_slideshows != null && _slideshows.IsRunning)
                 _slideshows.Tick();
 

@@ -19,6 +19,7 @@ namespace Photos.Desktop
         FileRecord _loadedFile;
         SKImage _image;
         string _caption = "";
+        readonly AsyncImage _loader = new AsyncImage();
 
         public PreviewWindow(PhotoProvider provider, Rectangle bounds)
             : base(bounds.X, bounds.Y, bounds.Width, bounds.Height, Core.Utils.LatinAppName)
@@ -29,6 +30,9 @@ namespace Photos.Desktop
 
         protected override void Advance()
         {
+            _loader.Poll();
+            _image = _loader.Current;
+
             int count = _provider.DisplayedCount;
             if (count == 0)
                 return;
@@ -43,21 +47,27 @@ namespace Photos.Desktop
 
         void LoadPhoto(FileRecord file)
         {
-            _image?.Dispose();
-            _image = null;
             if (file == null)
+            {
+                _loader.Request(() => null);
                 return;
+            }
 
             int position = Math.Clamp(_provider.Idx, 0, _provider.DisplayedCount - 1) + 1;
             _caption = $"{position} / {_provider.DisplayedCount}   {file.Src.FirstOrDefault().FN}";
 
-            using var data = _provider.Indexer.GetFullImage(file);
-            if (data == null)
-                return;
-
+            var data = _provider.Indexer.GetFullImage(file); // the file is read here; decoding happens off this thread
             int side = Math.Min(ClientSize.X, ClientSize.Y);
-            ImageLoader.DecodeAndResizeImage(data, ImageLoader.ScaleToMinSide(side, side));
-            _image = data.Bitmap == null ? null : SKImage.FromBitmap(data.Bitmap);
+            _loader.Request(() =>
+            {
+                if (data == null)
+                    return null;
+                using (data)
+                {
+                    ImageLoader.DecodeAndResizeImage(data, ImageLoader.ScaleToMinSide(side, side));
+                    return data.Bitmap == null ? null : SKImage.FromBitmap(data.Bitmap);
+                }
+            });
         }
 
         protected override void DrawFrame(SKCanvas canvas, int width, int height)
@@ -98,7 +108,7 @@ namespace Photos.Desktop
 
         protected override void ReleaseResources()
         {
-            _image?.Dispose();
+            _loader.Dispose();
             _image = null;
         }
     }

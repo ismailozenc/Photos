@@ -338,11 +338,13 @@ namespace Photos.Desktop
 
         void UnlockFromWindow()
         {
-            var password = NativeDialogs.PasswordPrompt?.Invoke("Enter password for private folders");
-            if (password == null)
-                return; // cancelled, or no password prompt on this platform
-            if (!_provider.TryUnlockPrivate(password))
-                NativeDialogs.Show?.Invoke(new[] { "Wrong password" }, new[] { new MessageBoxButton() { Text = "OK", Action = () => { } } });
+            NativeDialogs.PasswordPrompt?.Invoke("Enter password for private folders", password =>
+            {
+                if (password == null)
+                    return; // cancelled
+                if (!_provider.TryUnlockPrivate(password))
+                    NativeDialogs.Show?.Invoke(new[] { "Wrong password" }, new[] { new MessageBoxButton() { Text = "OK", Action = () => { } } });
+            });
         }
 
         void HandleKeyDown(KeyboardKeyEventArgs e)
