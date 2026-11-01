@@ -338,7 +338,7 @@ namespace Photos.Core
                 IsDirty = true;
             }
 
-            foreach (var item in newFile.EnumOptionalData(stringsOnly: false))
+            foreach (var item in newFile.EnumOptionalData())
             {
                 if (existingFile.GetOptional(item.Key) != item.Value)
                 {

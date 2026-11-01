@@ -13,10 +13,7 @@ namespace Photos.Core.StoredTypes
     public enum OptionalKeys
     {
         Lat = 1,
-        Lon = 2,
-        City = 3,
-        Country = 4,
-        CameraModel = 5
+        Lon = 2
     }
 
     [MessagePackObject]
@@ -157,35 +154,11 @@ namespace Photos.Core.StoredTypes
             OptionalData[(int)key] = val;
         }
 
-        static Dictionary<OptionalKeys, string> _optNames = new()
-        {
-            { OptionalKeys.Lat, "GPS Latitude" },
-            { OptionalKeys.Lon, "GPS Longitude" },
-            { OptionalKeys.Country, "GPS Country" },
-            { OptionalKeys.City, "Nearest populated place" },
-            { OptionalKeys.CameraModel, "Camera model" },
-        };
-
-        static readonly OptionalKeys[] StringOptions = new[] { OptionalKeys.Country, OptionalKeys.City, OptionalKeys.CameraModel };
-        public static (string key, string text) FormatOptional(Storage storage, OptionalKeys key, int val)
-        {
-            var desc = _optNames.TryGetValue(key, out var des) ? des : "<unknown>";
-
-            var text = key switch
-            {
-                OptionalKeys.Lat or OptionalKeys.Lon => LoadDegree(val).ToString("0.#####"),
-                _ => StringOptions.Contains(key) ? storage.Strings.GetValue(val) :  throw new NotImplementedException()
-            };
-
-            return (desc, text);
-        }
-
-        public IEnumerable<(OptionalKeys Key, int Value)> EnumOptionalData(bool stringsOnly)
+        public IEnumerable<(OptionalKeys Key, int Value)> EnumOptionalData()
         {
             if (OptionalData != null)
                 foreach (var item in OptionalData)
-                    if (!stringsOnly || StringOptions.Contains((OptionalKeys)item.Key))
-                        yield return ((OptionalKeys)item.Key, item.Value);
+                    yield return ((OptionalKeys)item.Key, item.Value);
         }
 
         public static DateTime TimeFrom(long time) => new DateTime((int)(time / 10000_000000L), (int)(time / 100_000000L % 100), (int)(time / 1_000000L % 100),
@@ -245,20 +218,10 @@ namespace Photos.Core.StoredTypes
 
         public const int CurrentHeaderVersion = 2;
         const int DegreeMultiply = 1_000_000;
-        static List<(GeoCoordinate coord, string country, string title, int radius)> _cities;
 
         public void FillExifFields(SKData skData, Storage db)
         {
             var exif = new ExifReader(skData.AsSpan());
-
-            if (exif.TryGetSingleValue(ExifTags.Make, out string make))
-            {
-                make = make.Trim();
-                if (exif.TryGetSingleValue(ExifTags.Model, out string model))
-                    make = $"{make} - {model.Trim()}";
-
-                SetOptional(OptionalKeys.CameraModel, db.Strings.GetIndex(make));
-            }
 
             if (exif.TryGetSingleValue(ExifTags.DateTimeOriginal, out DateTime dateTime) || exif.TryGetSingleValue(ExifTags.DateTime, out dateTime))
                 DT = TimeTo(dateTime);
@@ -276,24 +239,17 @@ namespace Photos.Core.StoredTypes
                     lo = -lo;
 
 
-                if (GeoCoordinate.Validate(la) && GeoCoordinate.Validate(lo))
+                if (ValidDegree(la) && ValidDegree(lo))
                 {
                     SetOptional(OptionalKeys.Lat, SaveDegree(la));
                     SetOptional(OptionalKeys.Lon, SaveDegree(lo));
 
-                    var coord = new GeoCoordinate() { Latitude = la, Longitude = lo };
-
-                    _cities ??= Utils.ReadAllLines(Utils.GetResource<FileRecord>("cities.csv")).Select(x => x.Split('\t'))
-                        .Select(x => (new GeoCoordinate() { Latitude = double.Parse(x[0], CultureInfo.InvariantCulture), Longitude = double.Parse(x[1], CultureInfo.InvariantCulture) }, 
-                        x[2], x[3], int.Parse(x[4]))).ToList();
-
-                    var city = _cities.MinBy(x => coord.GetDistanceTo(x.coord) - x.radius);
-
-                    SetOptional(OptionalKeys.City, db.Strings.GetIndex(city.title));
-                    SetOptional(OptionalKeys.Country, db.Strings.GetIndex(city.country));
                 }
             }
         }
+
+        /// <summary>A GPS value is usable when it is a finite, non-zero number.</summary>
+        static bool ValidDegree(double d) => !double.IsNaN(d) && !double.IsInfinity(d) && d != 0;
 
         private static int SaveDegree(double d) => (int)(d * DegreeMultiply);
         public static double LoadDegree(int v) => (double)v / DegreeMultiply;

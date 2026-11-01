@@ -1024,12 +1024,6 @@ namespace Photos.Core
             if (thumb != null)
                 m.Items.Add(SetupItem(new() { Text = $"Thumbnail resolution: {thumb.Width}x{thumb.Height}" }));
 
-            foreach (var item in file.EnumOptionalData(stringsOnly: true))
-            {
-                var (key, text) = FileRecord.FormatOptional(photoProvider.DB, item.Key, item.Value);
-                m.Items.Add(SetupItem(new() { Text = $"{key}: {text}" }));
-            }
-
             if (file == CurrentFile)
                 m.Items.Add(SetupItem(new() { Text = $"Rendered as: {_lastRenderInfo.Width}x{_lastRenderInfo.Height} {_lastRenderInfo.BytesSize64 >> 20} MB" }));
 
