@@ -10,7 +10,7 @@ Reviewed at commit `432642f`, updated after `7ef7081`. No .NET SDK was available
 
 | Area | Open | Most important |
 | --- | --- | --- |
-| Build and compile | 3 risks | SkiaSharp 4 and Magick.NET 15 not yet built |
+| Build and compile | 2 risks | SkiaSharp 4 and Magick.NET 15 not yet built |
 | Bugs and behaviour errors | 8 | Settings and index not saved on exit |
 | Threading and data safety | 4 | Settings handlers run under a lock on background threads |
 | Performance | 5 | Deleted-folder lookup rebuilt per row, per frame |
@@ -21,13 +21,12 @@ Reviewed at commit `432642f`, updated after `7ef7081`. No .NET SDK was available
 
 ## Build and compile
 
-The reported build errors (`IsSelectedFolder` missing, `SKRect` has no `Id`) and the obsolete `DrawText`, `DrawImage` and `DrawBitmap` calls are fixed in `7ef7081`. Three risks remain until a clean Windows build.
+The reported build errors (`IsSelectedFolder` missing, `SKRect` has no `Id`) and the obsolete `DrawText`, `DrawImage` and `DrawBitmap` calls are fixed in `7ef7081`. The six obsolete `SKPath.AddPath` calls are gone too. Two risks remain until a clean Windows build. Nullable reference checking is off in all projects; turning it on in `Photos.Core` produced about 200 warnings, which need annotating by hand with a compiler at hand.
 
 | Risk | Where | What to check |
 | --- | --- | --- |
-| SkiaSharp 3.119 → 4.154 (major version) | All drawing code; `Game.cs` and `SkiaWindow.cs` GL setup | Removed or renamed APIs; six `SKPath.AddPath` calls in `UtilsUI.cs` are obsolete and should move to `SKPathBuilder` |
+| SkiaSharp 3.119 → 4.154 (major version) | All drawing code; `Game.cs` and `SkiaWindow.cs` GL setup | Removed or renamed APIs |
 | Magick.NET 14.15 → 15.0 (major version) | `DesktopImageLoader.cs` (`MagickImage.Read`, `GetPixelsUnsafe().ToByteArray`) | Changed read and pixel APIs |
-| Nullable enabled in `Photos.Core` | About 6,800 lines written without annotations | Warnings only, but likely hundreds; they hide real ones |
 
 ## Bugs and behaviour errors
 
