@@ -44,6 +44,23 @@ namespace Photos.Core
                     OnClick = () => photoProvider.SetShowDeleted(!photoProvider.ShowDeleted),
                 });
 
+            if (photoProvider.ShowDeleted)
+            {
+                int copies = photoProvider.DeletedCopyCount;
+                menu.Items.Add(new()
+                {
+                    Text = $"Restore all ({copies})",
+                    OnClick = () => ShowDeletedResult(photoProvider.RestoreAllDeleted(), "Restored"),
+                    ReturnLevel = Menu.CloseMenuLevel,
+                });
+                menu.Items.Add(new()
+                {
+                    Text = "Empty deleted images",
+                    Submenu = m => Menu.Confirm(m, $"Permanently delete {copies} images", () =>
+                        MainToast.Show($"Deleted {photoProvider.EmptyDeleted()} images"), new[] { "This cannot be undone" }),
+                });
+            }
+
             if (photoProvider.HasPrivateFolders)
                 menu.Items.Add(new()
                 {
@@ -75,14 +92,22 @@ namespace Photos.Core
                     new[] { "Use this option to refresh existing thumbnails", "All photos will be reindexed", "It can take some time!" })
                 });
 
+            menu.Items.Add(new()
+            {
+                Text = $"Slideshow interval: {photoProvider.DB.Settings.SlideshowIntervalMs / 1000} s",
+                OnClick = () => photoProvider.DB.UpdateSettings(s => s with { SlideshowIntervalSec = NextSlideshowInterval(s.SlideshowIntervalMs / 1000) }),
+            });
+
             OnBuildPlatformSpecifiMenu?.Invoke(MenuSection.Settings, menu);
 
             menu.Items.Add(new()
             {
                 Text = $"Debug mode: {(photoProvider.DB.Settings.DevMode ? "ON" : "OFF")}",
-                OnClick = () => photoProvider.DB.Settings = photoProvider.DB.Settings with { DevMode = !photoProvider.DB.Settings.DevMode }
+                OnClick = () => photoProvider.DB.UpdateSettings(s => s with { DevMode = !s.DevMode })
             });
         }
+
+        static int NextSlideshowInterval(int seconds) => seconds switch { 3 => 5, 5 => 10, 10 => 30, _ => 3 };
 
         void ToggleLockPrivate()
         {
@@ -107,8 +132,9 @@ namespace Photos.Core
             if (clicked == null || !clicked.IsIndexed())
                 return;
 
-            var indexes = ThumbnailView.SelectedItems.Contains(idx) ? ThumbnailView.SelectedItems.OrderBy(x => x).ToList() : new List<int> { idx };
-            var files = indexes.Select(i => photoProvider.GetFile(i)).Where(f => f != null && f.IsIndexed()).ToList();
+            var files = ThumbnailView.SelectedSigs.Contains(clicked.Sig)
+                ? ThumbnailView.SelectedFiles().Where(f => f.IsIndexed()).ToList()
+                : new List<FileRecord> { clicked };
             var items = new List<MenuItem>();
 
             if (files.Count == 1)
@@ -189,6 +215,9 @@ namespace Photos.Core
                 items.Add(new MenuItem() { Text = $"{verb} a copy", Submenu = s => s.Items.AddRange(copyEntries) });
             }
         }
+
+        void ShowDeletedResult((int done, int failed, string lastError) result, string success) =>
+            MainToast.Show(result.failed == 0 ? $"{success}: {result.done}" : $"{result.done} done, {result.failed} failed: {result.lastError}");
 
         void RunOnCopies(List<FileRecord> files, bool restoring)
         {
@@ -305,7 +334,7 @@ namespace Photos.Core
             menu.Items.AddRange(Enumerable.Range(0, ThumbnailSizes.Sizes.Length).Select(i => new MenuItem()
             {
                 Text = $"{ThumbnailSizes.Names[i]} ({ThumbnailSizes.Sizes[i]}px)",
-                OnClick = () => photoProvider.DB.Settings = photoProvider.DB.Settings with { ThumbnailDrawSize = ThumbnailSizes.Sizes[i] },
+                OnClick = () => photoProvider.DB.UpdateSettings(s => s with { ThumbnailDrawSize = ThumbnailSizes.Sizes[i] }),
                 Selected = () => ThumbnailSizes.SlotFor(photoProvider.DB.Settings.ThumbnailDrawSize) == i,
             }));
         }

@@ -17,7 +17,7 @@ namespace Photos.Desktop
     /// </summary>
     internal sealed class SlideshowWindow : GameWindow
     {
-        const int IntervalMs = 5000;
+        public int IntervalMs = 5000;
 
         readonly PhotoProvider _provider;
         readonly Stopwatch _timer = new Stopwatch();
@@ -100,18 +100,22 @@ namespace Photos.Desktop
         {
             int count = _provider.DisplayedCount;
             var file = count == 0 ? null : _provider.GetFile(_index % count);
-            var data = file == null ? null : _provider.Indexer.GetFullImage(file); // the file is read here; decoding happens off this thread
-            int side = Math.Min(ClientSize.X, ClientSize.Y);
-            _loader.Request(() =>
+            if (file == null)
             {
-                if (data == null)
-                    return null;
-                using (data)
-                {
-                    ImageLoader.DecodeAndResizeImage(data, ImageLoader.ScaleToMinSide(side, side));
-                    return data.Bitmap == null ? null : SKImage.FromBitmap(data.Bitmap);
-                }
-            });
+                _loader.Request(() => null);
+                return;
+            }
+
+            int side = Math.Min(ClientSize.X, ClientSize.Y);
+            if (!_loader.TryPromote(file))
+                _loader.Request(AsyncImage.Decoder(_provider.Indexer.GetFullImage(file), side)); // the file is read here; decoding is off this thread
+
+            if (count > 1)
+            {
+                var next = _provider.GetFile((_index + 1) % count);
+                if (next != null && !_loader.IsPrefetching(next))
+                    _loader.Prefetch(next, AsyncImage.Decoder(_provider.Indexer.GetFullImage(next), side));
+            }
         }
 
         void Draw()

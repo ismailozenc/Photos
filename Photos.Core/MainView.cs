@@ -93,13 +93,32 @@ namespace Photos.Core
             photoProvider.PhotoSelected += () => ThumbnailView.Enabled.Const = false;
             _photoView.MenuButton.AdjustRect(x => x.OffsetRect(y: (WindowControlPanel.Enabled ? WindowControlPanel.Position.Bottom + ButtonPadding : 0)));
 
+            new TextLabel() // selected count
+            {
+                Link = Attach(() => SKRect.Create(0, Padding.Value.Top + ButtonSize + (BigButtonSize - TextLabelSize) / 2 + ButtonPadding,
+                    InnerRect.Width - ButtonSize * 3 - ButtonPadding * 3, TextLabelSize)),
+                Padding = { Const = 3 },
+                Text = () => $"{ThumbnailView.SelectedSigs.Count} items selected ",
+                TextAlign = { Const = SKTextAlign.Right },
+                Background = { Color = SKColors.Black },
+                Enabled = { Func = () => ThumbnailView.Enabled && ThumbnailView.SelectionActive },
+            };
+
             ButtonPanel = new StackPanel()
             {
                 MeasureChild = x => BigButtonSize,
                 ItemMargin = { Func = () => ButtonPadding },
                 Link = Attach(() => SKRect.Create(InnerRect.Right - BigButtonSize, (WindowControlPanel.Enabled ? WindowControlPanel.Position.Bottom : InnerRect.Top) + ButtonPadding,
-                    BigButtonSize, (BigButtonSize + ButtonPadding) * 5 - ButtonPadding)),
+                    BigButtonSize, (BigButtonSize + ButtonPadding) * 7 - ButtonPadding)),
                 Enabled = { Func = () => !photoProvider.IsInitRunning && ThumbnailView.Enabled },
+            };
+
+            new Button() // clear selection
+            {
+                Link = ButtonPanel.Attach(),
+                Icon = { Const = IconStore.X },
+                OnClick = () => ThumbnailView.SelectedSigs.Clear(),
+                Enabled = { Func = () => ThumbnailView.SelectionActive }
             };
 
             new Button() // return to gallery
@@ -201,7 +220,7 @@ namespace Photos.Core
                 Link = Attach(() => InnerRect.Select(x => SKRect.Create(x.Right - 282, x.Bottom - 50, 272, 40))),
                 Enabled = { Func = () => ThumbnailView.Enabled },
             };
-            _sizeSlider.OnChange = step => photoProvider.DB.Settings = photoProvider.DB.Settings with { ThumbnailDrawSize = ThumbnailSizes.Sizes[step] };
+            _sizeSlider.OnChange = step => photoProvider.DB.UpdateSettings(s => s with { ThumbnailDrawSize = ThumbnailSizes.Sizes[step] });
             if (photoProvider.DB.Settings != null)
                 _sizeSlider.Index = ThumbnailSizes.SlotFor(photoProvider.DB.Settings.ThumbnailDrawSize);
             photoProvider.DB.OnSettingsUpdate += (oldSettings, newSettings) => _sizeSlider.Index = ThumbnailSizes.SlotFor(newSettings.ThumbnailDrawSize);
@@ -282,7 +301,7 @@ namespace Photos.Core
 
             photoProvider.OnDisplayOrderUpdate += () => Window.Run(() =>
             {
-                ThumbnailView.SelectedItems.Clear();
+                ThumbnailView.SelectedSigs.IntersectWith(photoProvider.DisplayedFileList.Select(f => f.Sig));
                 Window.Invalidate();
             });
 
@@ -347,10 +366,20 @@ namespace Photos.Core
 
         void KeyUp(libKeyMessage e)
         {
-            if (e.Key == libKeys.Escape)
+            if (e.Key == libKeys.Escape && ThumbnailView.SelectionActive)
+            {
+                e.Consume();
+                ThumbnailView.SelectedSigs.Clear();
+            }
+            else if (e.Key == libKeys.Escape)
             {
                 e.Consume();
                 GoBack();
+            }
+            else if (e.Key == libKeys.A && Window.IsCtrlDown() && ThumbnailView.Enabled)
+            {
+                e.Consume();
+                ThumbnailView.SelectAll();
             }
             else if (e.Key == libKeys.S && ThumbnailView.Enabled && !photoProvider.IsInitRunning && photoProvider.DisplayedCount > 0)
             {

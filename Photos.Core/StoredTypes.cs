@@ -236,6 +236,13 @@ namespace Photos.Core.StoredTypes
     [MessagePackObject(AllowPrivate = true)]
     public sealed record class SettingsRecord
     {
+        /// <summary>Seconds each photo stays up in a slideshow. Zero (older files) means the default of 5.</summary>
+        [Key("ssi")]
+        public int SlideshowIntervalSec;
+
+        [IgnoreMember]
+        public int SlideshowIntervalMs => SlideshowIntervalSec > 0 ? SlideshowIntervalSec * 1000 : 5000;
+
         [Key("da")]
         public byte[] Data;
         [Key("tds")]

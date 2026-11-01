@@ -107,6 +107,8 @@ namespace Photos.Core
             Indexer = new PhotoIndexer(DB, protectUnreadableFolders, Path.Combine(editorDir, Utils.LatinAppName));
 
             FilterService = new(DB);
+            PruneDeletedOriginals();
+            RefreshWatchers();
             FilterService.FilterUpdate += () => EnqueueRefreshDisplayOrder(true);
 
             Indexer.IndexUpdateRequest += () => {
@@ -253,21 +255,92 @@ namespace Photos.Core
         //const int WorkStatusDelay = 1000;
         public event Action OnDisplayOrderUpdate;
 
+        readonly List<FileSystemWatcher> _watchers = new List<FileSystemWatcher>();
+        System.Threading.Timer _watchDebounce;
+        volatile bool _diskChanged;
+
+        /// <summary>True once after the library folders changed on disk. The host then rescans on its render thread.</summary>
+        public bool TakeDiskChange()
+        {
+            if (!_diskChanged)
+                return false;
+            _diskChanged = false;
+            return true;
+        }
+
+        /// <summary>Watches the library folders, so new and removed photos are picked up without "Check for new photos".</summary>
+        void RefreshWatchers()
+        {
+            DisposeWatchers();
+            foreach (var dir in GetDirs())
+            {
+                if (!Directory.Exists(dir))
+                    continue;
+                try
+                {
+                    var watcher = new FileSystemWatcher(dir)
+                    {
+                        IncludeSubdirectories = true,
+                        NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                    };
+                    watcher.Created += OnDiskChanged;
+                    watcher.Deleted += OnDiskChanged;
+                    watcher.Renamed += OnDiskChanged;
+                    watcher.Changed += OnDiskChanged;
+                    watcher.EnableRaisingEvents = true;
+                    _watchers.Add(watcher);
+                }
+                catch (Exception ex)
+                {
+                    Utils.LogError(ex);
+                }
+            }
+        }
+
+        /// <summary>Several events arrive for one change; the rescan waits three seconds after the last one.</summary>
+        void OnDiskChanged(object sender, FileSystemEventArgs e)
+        {
+            lock (_watchers)
+            {
+                _watchDebounce ??= new System.Threading.Timer(_ => _diskChanged = true, null,
+                    System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+                _watchDebounce.Change(3000, System.Threading.Timeout.Infinite);
+            }
+        }
+
+        void DisposeWatchers()
+        {
+            foreach (var watcher in _watchers)
+                watcher.Dispose();
+            _watchers.Clear();
+        }
+
+        /// <summary>Drops deleted-image entries whose trashed file no longer exists, e.g. removed or moved outside the app.</summary>
+        void PruneDeletedOriginals()
+        {
+            var entries = DB.Settings.DeletedOriginals ?? Array.Empty<string>();
+            var kept = entries.Where(x => File.Exists(x.Split('|')[0])).ToArray();
+            if (kept.Length == entries.Length)
+                return;
+            DB.UpdateSettings(s => s with { DeletedOriginals = kept });
+            _deletedMap = null;
+        }
+
         public IReadOnlyList<string> GetDirs() => DB.Settings.Dirs;
         public void AddDir(string path)
         {
             if (DB.Settings.Dirs.Contains(path))
                 return;
 
-            DB.Settings.Dirs = DB.Settings.Dirs.AddToArr(path);
-            DB.SaveSettings();
+            DB.UpdateSettings(s => s with { Dirs = s.Dirs.AddToArr(path) });
+            RefreshWatchers();
 
             RestartBackgroundTasks(null, new IndexTaskConfig() { ForceRefreshDisplayAfterIndex = true });
         }
         public void RemoveDir(string d)
         {
-            DB.Settings.Dirs = DB.Settings.Dirs.Where(x => x != d).ToArray();
-            DB.SaveSettings();
+            DB.UpdateSettings(s => s with { Dirs = s.Dirs.Where(x => x != d).ToArray() });
+            RefreshWatchers();
 
             EnqueueRefreshDisplayOrder();
             RestartBackgroundTasks(null);
@@ -310,11 +383,12 @@ namespace Photos.Core
                 var files = GetLibraryFiles(out var dirs);
                 TotalCount = files.Count;
 
-                FilterService.IsHidden = f => IsPrivateHidden(f) || IsFullyTrashed(f) || IsFullyExcluded(f);
+                var visibility = BuildVisibility();
+                FilterService.IsHidden = f => HiddenIn(visibility, f);
                 if (!skipFilters)
                     FilterService.RefreshFilters(files, dirs.Where(x => x != null), initTask != null);
 
-                files = files.Where(f => ShowDeleted ? !IsPrivateHidden(f) && HasTrashedSource(f) : IsInLibrary(f)).ToList(); // the open view: deleted images, or the library
+                files = files.Where(f => ShowDeleted ? !PrivateHiddenIn(visibility, f) && HasTrashedIn(visibility, f) : LibraryIn(visibility, f)).ToList(); // the open view: deleted images, or the library
                 FilterService.FilterFiles(files);
 
                 if (FilterService.CurrentSortMode == SortModeEnum.Filename)
@@ -378,6 +452,7 @@ namespace Photos.Core
                     DispalyGroups = dispalyGroups;
                     ClampIdx(ref _idx);
                     DisplayedCount = _displayOrder.Count;
+                    _displayVersion++;
 
                     SystemUpdates.Enqueue(new UpdateOp() { PreLockAction = () => OnDisplayOrderUpdate?.Invoke() });
                 };
@@ -390,36 +465,82 @@ namespace Photos.Core
             }
         }
 
+        /// <summary>The visibility rules as sets of directory indexes, built once per refresh so each photo costs a few lookups.</summary>
+        sealed class VisibilitySnapshot
+        {
+            public bool Unlocked;
+            public readonly HashSet<int> PrivateDirs = new HashSet<int>();
+            public readonly HashSet<int> ExcludedDirs = new HashSet<int>();
+            public readonly HashSet<(int Dir, string FileName)> Trashed = new HashSet<(int, string)>();
+        }
+
+        VisibilitySnapshot BuildVisibility()
+        {
+            var snap = new VisibilitySnapshot { Unlocked = PrivateUnlocked };
+            var privateIds = PrivateFolderIds;
+            var excludedIds = DB.Settings.ExcludedFolders ?? Array.Empty<string>();
+            var dirs = DB.Directories.ToArray();
+            for (int i = 0; i < dirs.Length; i++)
+            {
+                var d = dirs[i];
+                if (d == null)
+                    continue;
+                var key = $"{d.SourceId}/{d.Directory.ToLowerInvariant()}";
+                if (privateIds.Count > 0 && PrivateFolderRules.IsPrivate(privateIds, key))
+                    snap.PrivateDirs.Add(i);
+                if (excludedIds.Contains(key, StringComparer.OrdinalIgnoreCase))
+                    snap.ExcludedDirs.Add(i);
+            }
+
+            foreach (var trashed in DeletedMap.Keys)
+            {
+                int dirIdx = DB.Directories.GetIndex(new DirectoryRecord() { Directory = Path.GetDirectoryName(trashed), SourceId = 0 }, noAdd: true);
+                if (dirIdx >= 0)
+                    snap.Trashed.Add((dirIdx, Path.GetFileName(trashed)));
+            }
+            return snap;
+        }
+
+        static bool PrivateHiddenIn(VisibilitySnapshot v, FileRecord f) =>
+            !v.Unlocked && v.PrivateDirs.Count > 0 && f.Src.Any(s => v.PrivateDirs.Contains(s.D));
+
+        static bool TrashedIn(VisibilitySnapshot v, SourceRecord s) =>
+            v.Trashed.Count > 0 && v.Trashed.Contains((s.D, s.FN.ToLowerInvariant()));
+
+        static bool ExcludedIn(VisibilitySnapshot v, SourceRecord s) => v.ExcludedDirs.Contains(s.D);
+
+        static bool HasTrashedIn(VisibilitySnapshot v, FileRecord f) => f.Src.Any(s => TrashedIn(v, s));
+
         /// <summary>The library's rule for showing a photo: not private while locked, not moved to deleted images, not in a hidden folder.</summary>
-        public bool IsInLibrary(FileRecord file) => !IsPrivateHidden(file) && !IsFullyTrashed(file) && !IsFullyExcluded(file);
+        static bool LibraryIn(VisibilitySnapshot v, FileRecord f) =>
+            !PrivateHiddenIn(v, f) && !f.Src.All(s => TrashedIn(v, s)) && !f.Src.All(s => ExcludedIn(v, s));
+
+        static bool HiddenIn(VisibilitySnapshot v, FileRecord f) =>
+            PrivateHiddenIn(v, f) || f.Src.All(s => TrashedIn(v, s)) || f.Src.All(s => ExcludedIn(v, s));
+
+        /// <summary>The files the library shows, under the same rules as the grid. The rules are built once for the whole list.</summary>
+        public List<FileRecord> LibraryFiles(IEnumerable<FileRecord> files)
+        {
+            var visibility = BuildVisibility();
+            return files.Where(f => LibraryIn(visibility, f)).ToList();
+        }
 
         /// <summary>True when the folder itself is hidden from browse and slideshows (subfolders are not affected).</summary>
         public bool IsExcludedFolder(string folderId) =>
             (DB.Settings.ExcludedFolders ?? Array.Empty<string>()).Contains(folderId, StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>True when this copy lies directly in a folder hidden from browse and slideshows.</summary>
-        public bool IsExcludedSource(SourceRecord s)
-        {
-            if (!IsAnyExcludedFolder)
-                return false;
-            var dir = DB.Directories.GetValue(s.D);
-            return dir != null && IsExcludedFolder($"{dir.SourceId}/{dir.Directory.ToLowerInvariant()}");
-        }
-
-        bool IsAnyExcludedFolder => (DB.Settings.ExcludedFolders?.Length ?? 0) > 0;
-
-        /// <summary>A photo is hidden only when every copy is in a hidden folder.</summary>
-        public bool IsFullyExcluded(FileRecord file) => file.Src.All(IsExcludedSource);
-
         /// <summary>Hides or shows several folders in browse and slideshows, with one settings save and one refresh.</summary>
         public void SetFoldersExcluded(IEnumerable<string> folderIds, bool excluded)
         {
             var changed = folderIds.ToList();
-            var ids = (DB.Settings.ExcludedFolders ?? Array.Empty<string>())
-                .Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
-            if (excluded)
-                ids.AddRange(changed);
-            DB.Settings = DB.Settings with { ExcludedFolders = ids.ToArray() };
+            DB.UpdateSettings(s =>
+            {
+                var ids = (s.ExcludedFolders ?? Array.Empty<string>())
+                    .Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
+                if (excluded)
+                    ids.AddRange(changed);
+                return s with { ExcludedFolders = ids.ToArray() };
+            });
             EnqueueRefreshDisplayOrder();
         }
 
@@ -455,12 +576,6 @@ namespace Photos.Core
             return map.Count > 0 && map.ContainsKey(DB.Directories.GetValue(s.D).CombinePath(s).ToLowerInvariant());
         }
 
-        /// <summary>A photo is hidden from the library only when every copy is in the deleted-images folder.</summary>
-        public bool IsFullyTrashed(FileRecord file) => file.Src.All(IsTrashedSource);
-
-        /// <summary>True when at least one copy is in the deleted-images folder.</summary>
-        public bool HasTrashedSource(FileRecord file) => file.Src.Any(IsTrashedSource);
-
         /// <summary>Indexes of the copies the current view can act on: local copies that are trashed in the deleted view, and not trashed otherwise.</summary>
         public IEnumerable<int> ActionableSources(FileRecord file)
         {
@@ -470,6 +585,43 @@ namespace Photos.Core
                 if (dir.IsLocal() && IsTrashedSource(file.Src[i]) == ShowDeleted && File.Exists(dir.CombinePath(file.Src[i])))
                     yield return i;
             }
+        }
+
+        /// <summary>Copies currently in deleted-images folders.</summary>
+        public int DeletedCopyCount => DB.ListFiles().Sum(f => f.Src.Count(IsTrashedSource));
+
+        /// <summary>Restores every deleted copy to its original folder.</summary>
+        public (int done, int failed, string lastError) RestoreAllDeleted() =>
+            RunTrashBatch(DB.ListFiles().SelectMany(f => Enumerable.Range(0, f.Src.Length)
+                .Where(i => IsTrashedSource(f.Src[i])).Select(i => (f, i))).ToList(), restore: true);
+
+        /// <summary>
+        /// Permanently deletes every copy in the deleted-images folders. Entries whose file could not be deleted are kept.
+        /// A rescan then removes the deleted copies from the library.
+        /// </summary>
+        public int EmptyDeleted()
+        {
+            int deleted = 0;
+            foreach (var f in DB.ListFiles())
+                for (int i = 0; i < f.Src.Length; i++)
+                    if (IsTrashedSource(f.Src[i]))
+                    {
+                        var path = DB.Directories.GetValue(f.Src[i].D).CombinePath(f.Src[i]);
+                        try
+                        {
+                            File.Delete(path);
+                            deleted++;
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.LogError(ex);
+                        }
+                    }
+
+            DB.UpdateSettings(s => s with { DeletedOriginals = (s.DeletedOriginals ?? Array.Empty<string>()).Where(x => File.Exists(x.Split('|')[0])).ToArray() });
+            _deletedMap = null;
+            UpdateLibraryMaybe(new IndexTaskConfig() { DoneMessage = "deleted images removed" });
+            return deleted;
         }
 
         /// <summary>
@@ -501,9 +653,12 @@ namespace Photos.Core
 
             if (done > 0)
             {
-                var kept = (DB.Settings.DeletedOriginals ?? Array.Empty<string>())
-                    .Where(x => !removed.Any(r => x.StartsWith(r + "|", StringComparison.OrdinalIgnoreCase)));
-                DB.Settings = DB.Settings with { DeletedOriginals = kept.Concat(added).ToArray() };
+                DB.UpdateSettings(s => s with
+                {
+                    DeletedOriginals = (s.DeletedOriginals ?? Array.Empty<string>())
+                        .Where(x => !removed.Any(r => x.StartsWith(r + "|", StringComparison.OrdinalIgnoreCase)))
+                        .Concat(added).ToArray()
+                });
                 _deletedMap = null;
                 DB.SaveFiles();
             }
@@ -606,18 +761,6 @@ namespace Photos.Core
 
         public bool HasPrivateFolders => PrivateFolderIds.Count > 0;
 
-        /// <summary>True when a file must not be shown: it lies in a private folder and the session is locked.</summary>
-        public bool IsPrivateHidden(FileRecord file)
-        {
-            if (PrivateUnlocked || !HasPrivateFolders)
-                return false;
-            return file.Src.Any(s =>
-            {
-                var dir = DB.Directories.GetValue(s.D);
-                return dir != null && PrivateFolderRules.IsPrivate(PrivateFolderIds, $"{dir.SourceId}/{dir.Directory.ToLowerInvariant()}");
-            });
-        }
-
         public bool TryUnlockPrivate(string password)
         {
             if (password != PrivateFolderRules.Password)
@@ -639,10 +782,14 @@ namespace Photos.Core
         public void SetFoldersPrivate(IEnumerable<string> folderIds, bool isPrivate)
         {
             var changed = folderIds.ToList();
-            var ids = PrivateFolderIds.Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
-            if (isPrivate)
-                ids.AddRange(changed);
-            DB.Settings = DB.Settings with { PrivateFolders = ids.ToArray() };
+            DB.UpdateSettings(s =>
+            {
+                var ids = (s.PrivateFolders ?? Array.Empty<string>())
+                    .Where(x => !changed.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
+                if (isPrivate)
+                    ids.AddRange(changed);
+                return s with { PrivateFolders = ids.ToArray() };
+            });
             EnqueueRefreshDisplayOrder();
         }
 
@@ -798,6 +945,7 @@ namespace Photos.Core
 
         public void Dispose()
         {
+            DisposeWatchers();
             TerminateIndexerTask();
             _shutdown = true;
             backgroundLoaderTask?.Wait();
@@ -808,6 +956,11 @@ namespace Photos.Core
         }        
 
         public int DisplayedCount, TotalCount;
+        volatile int _displayVersion;
+        /// <summary>The photos on display, in order.</summary>
+        public IReadOnlyList<FileRecord> DisplayedFileList => _displayOrder;
+        /// <summary>Changes every time the display order is rebuilt, so views can rebuild their rows only when needed.</summary>
+        public int DisplayVersion => _displayVersion;
         public bool IsInitRunning => !initTask.IsCompleted;
         internal bool IsIndexEmpty => DB.Count == 0 && initTask.IsCompleted;
 

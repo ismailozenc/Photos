@@ -34,6 +34,10 @@ namespace Photos.Desktop
         MonitorLayout _monitors;
         bool _monitorsAutoStart = true;
         bool _layoutWasRunning;
+        MainView _mainView;
+        bool _slideshowHintShown;
+        readonly Stopwatch _idle = Stopwatch.StartNew();
+        static readonly TimeSpan PrivateIdleLimit = TimeSpan.FromMinutes(5);
         SKSurface skSurface;
 
         PhotoProvider photoProvider;
@@ -110,6 +114,8 @@ namespace Photos.Desktop
 
             DesktopImageLoader.Register();
             WinFormsDialogs.Register();
+            if (OperatingSystem.IsWindows())
+                Core.Utils.DoubleClickTimeMs = () => WinUtils.DoubleClickMs();
             Core.Utils.Log($"Displays detected: {string.Join(", ", ScreenDetection.GetDisplayBounds())}");
             photoProvider = providerPromise.Result;
             _slideshows = new SlideshowController(photoProvider, () => Context.MakeCurrent());
@@ -152,6 +158,7 @@ namespace Photos.Desktop
                 },
                 MousePosition = () => MousePosition.ToSK(),
                 IsCtrlDown = () => IsKeyDown(Keys.LeftControl) || IsKeyDown(Keys.RightControl),
+                IsShiftDown = () => IsKeyDown(Keys.LeftShift) || IsKeyDown(Keys.RightShift),
                 IsBorderless = () => WindowBorder == WindowBorder.Hidden,
                 GR = skiaCtx,
                 MaxRenderTargetSize = Math.Min(GL.GetInteger(GetPName.MaxTextureSize), GL.GetInteger(GetPName.MaxRenderbufferSize)),
@@ -177,6 +184,7 @@ namespace Photos.Desktop
             }
 
             var mainView = new MainView(photoProvider);
+            _mainView = mainView;
             mainView.SlideshowRequested += StartSlideshowFromBrowse;
             mainView.BrowseShown += () => _monitors.ShowPreviewIfHidden();
 
@@ -207,8 +215,7 @@ namespace Photos.Desktop
                                 Text = $"Window background: {(photoProvider.DB.Settings.IsOpaqueBackground ? "opaque" : "transparent")}",
                                 OnClick = () =>
                                 {
-                                    photoProvider.DB.Settings.IsOpaqueBackground = !photoProvider.DB.Settings.IsOpaqueBackground;
-                                    photoProvider.DB.SaveSettings();
+                                    photoProvider.DB.UpdateSettings(s => s with { IsOpaqueBackground = !s.IsOpaqueBackground });
                                 }
                             });
                     }
@@ -241,6 +248,7 @@ namespace Photos.Desktop
 
         private void Game_MouseMove(MouseMoveEventArgs obj)
         {
+            _idle.Restart();
             var isDown = IsMouseButtonDown(MouseButton.Left);
             var curPoint = new SKPoint(obj.X, obj.Y);
             var e = new libMouseEvent(isDown ? downEvent : null)
@@ -258,6 +266,7 @@ namespace Photos.Desktop
 
         private void Game_MouseDown(MouseButtonEventArgs obj)
         {
+            _idle.Restart();
             lastPoint = MousePosition.ToSK();
             downEvent = new libMouseEvent()
             {
@@ -297,6 +306,7 @@ namespace Photos.Desktop
 
         private void Game_KeyUp(KeyboardKeyEventArgs e)
         {
+            _idle.Restart();
             _window.RouteKeyEvent(new libKeyMessage() { Key = (libKeys)e.Key });
         }
 
@@ -367,6 +377,11 @@ namespace Photos.Desktop
             _layoutWasRunning = _monitors.IsRunning;
             _monitors.Stop();
             _slideshows.Start();
+            if (_slideshows.IsRunning && !_slideshowHintShown)
+            {
+                _slideshowHintShown = true;
+                _mainView?.MainToast.Show("Space pauses · Left and Right skip · Escape stops all screens", 4);
+            }
             if (!_slideshows.IsRunning && _layoutWasRunning)
             {
                 _layoutWasRunning = false;
@@ -385,6 +400,11 @@ namespace Photos.Desktop
         protected override void OnRenderFrame(FrameEventArgs args)
         {
             NativeDialogs.RunPending();
+            if (photoProvider != null && photoProvider.PrivateUnlocked
+                && (_idle.Elapsed > PrivateIdleLimit || WindowState == WindowState.Minimized))
+                photoProvider.LockPrivate();
+            if (photoProvider != null && photoProvider.TakeDiskChange())
+                photoProvider.UpdateLibraryMaybe(new IndexTaskConfig() { DoneMessage = "library refresh completed" });
             if (_slideshows != null && _slideshows.IsRunning)
                 _slideshows.Tick();
 

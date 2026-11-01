@@ -26,6 +26,8 @@ namespace Photos.Core
         bool _hasPair;
         SKImage _imageA;
         SKImage _imageB;
+        readonly AsyncImage _loaderA = new AsyncImage();
+        readonly AsyncImage _loaderB = new AsyncImage();
         string _status = "";
 
         public event Action OnBackPressed;
@@ -54,8 +56,7 @@ namespace Photos.Core
             OnBackPressed?.Invoke();
         }
 
-        ulong[] LiveSignatures() => photoProvider.DB.ListFiles()
-            .Where(f => f.IsIndexed() && photoProvider.IsInLibrary(f))
+        ulong[] LiveSignatures() => photoProvider.LibraryFiles(photoProvider.DB.ListFiles().Where(f => f.IsIndexed()))
             .Select(f => f.Sig)
             .ToArray();
 
@@ -99,26 +100,24 @@ namespace Photos.Core
             if (!_hasPair)
                 return;
 
-            _imageA = DecodeSignature(_a);
-            _imageB = DecodeSignature(_b);
+            _loaderA.Request(DecodeSignature(_a));
+            _loaderB.Request(DecodeSignature(_b));
         }
 
-        SKImage DecodeSignature(ulong sig)
+        /// <summary>Reads the photo here and returns the decode step, which runs in the background.</summary>
+        Func<SKImage> DecodeSignature(ulong sig)
         {
             var file = photoProvider.DB.TryGetFileBySignature(sig);
-            if (file == null)
-                return null;
-
-            using var data = photoProvider.Indexer.GetFullImage(file);
-            if (data == null)
-                return null;
-
-            ImageLoader.DecodeAndResizeImage(data, ImageLoader.ScaleToMinSide(DecodeSideLength, DecodeSideLength));
-            return data.Bitmap == null ? null : SKImage.FromBitmap(data.Bitmap);
+            return AsyncImage.Decoder(file == null ? null : photoProvider.Indexer.GetFullImage(file), DecodeSideLength);
         }
 
         void RenderFrame(SKCanvas ctx)
         {
+            _loaderA.Poll();
+            _loaderB.Poll();
+            _imageA = _loaderA.Current;
+            _imageB = _loaderB.Current;
+
             var area = OuterRect;
             ctx.DrawRect(area, _backgroundPaint);
 
@@ -159,8 +158,8 @@ namespace Photos.Core
 
         void DisposeImages()
         {
-            _imageA?.Dispose();
-            _imageB?.Dispose();
+            _loaderA.Dispose();
+            _loaderB.Dispose();
             _imageA = null;
             _imageB = null;
         }

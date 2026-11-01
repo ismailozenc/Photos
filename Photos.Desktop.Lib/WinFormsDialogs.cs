@@ -25,7 +25,17 @@ namespace Photos.Desktop
         /// </summary>
         static void RunOnStaThread<T>(Func<T> show, Action<T> onDone)
         {
-            var thread = new Thread(() => onDone(show())) { IsBackground = true };
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    onDone(show());
+                }
+                catch (Exception ex)
+                {
+                    Photos.Core.Utils.LogError(ex); // a dialog failure must not take the whole app down
+                }
+            }) { IsBackground = true };
             thread.SetApartmentState(ApartmentState.STA);
             thread.Start();
         }

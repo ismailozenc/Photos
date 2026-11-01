@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Photos.Core", "Photos.Core\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Photos.Desktop.Lib", "Photos.Desktop.Lib\Photos.Desktop.Lib.csproj", "{6D9B14FF-B504-4CDC-9642-CC84AD05B407}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Photos.Tests", "Photos.Tests\Photos.Tests.csproj", "{DAF8D644-8D6B-4650-914E-52C84274B465}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,9 +28,13 @@ Global
 		{0FF640FF-754A-4B19-945B-9C9CE0305604}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0FF640FF-754A-4B19-945B-9C9CE0305604}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9E95ACD7-404F-4BE2-9554-D5B8B1D54203}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DAF8D644-8D6B-4650-914E-52C84274B465}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{9E95ACD7-404F-4BE2-9554-D5B8B1D54203}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DAF8D644-8D6B-4650-914E-52C84274B465}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9E95ACD7-404F-4BE2-9554-D5B8B1D54203}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DAF8D644-8D6B-4650-914E-52C84274B465}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9E95ACD7-404F-4BE2-9554-D5B8B1D54203}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DAF8D644-8D6B-4650-914E-52C84274B465}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6D9B14FF-B504-4CDC-9642-CC84AD05B407}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6D9B14FF-B504-4CDC-9642-CC84AD05B407}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6D9B14FF-B504-4CDC-9642-CC84AD05B407}.Release|Any CPU.ActiveCfg = Release|Any CPU

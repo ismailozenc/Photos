@@ -28,7 +28,9 @@ namespace Photos.Core
         public readonly ScrollContainer ScrollContainer;
 
         FileRecord lastShownFile;
-        public readonly HashSet<int> SelectedItems = new();
+        /// <summary>Selected photos, by signature. Signatures survive a refresh, so the selection does too.</summary>
+        public readonly HashSet<ulong> SelectedSigs = new();
+        public bool SelectionActive => SelectedSigs.Count > 0;
         Replicator imgReplicator, groupReplicator;
 
         public ThumbnailView(PhotoProvider photoProvider, Val<float> buttonSize)
@@ -130,13 +132,21 @@ namespace Photos.Core
                 {
                     // One click selects the photo for the preview; a second click on the same photo opens it.
                     var imgIndex = photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex;
-                    if (Window.IsCtrlDown())
+                    if (Window.IsShiftDown() && _anchor >= 0)
                     {
-                        if (!SelectedItems.Remove(imgIndex))
-                            SelectedItems.Add(imgIndex);
+                        SelectRange(_anchor, imgIndex);
                         return;
                     }
-                    bool isDoubleClick = imgIndex == _lastClickIdx && (DateTime.UtcNow - _lastClickUtc).TotalMilliseconds < DoubleClickMs;
+                    if (Window.IsCtrlDown())
+                    {
+                        var picked = photoProvider.GetFile(imgIndex);
+                        if (picked != null && picked.Sig != 0 && !SelectedSigs.Remove(picked.Sig))
+                            SelectedSigs.Add(picked.Sig);
+                        _anchor = imgIndex;
+                        return;
+                    }
+                    _anchor = imgIndex;
+                    bool isDoubleClick = imgIndex == _lastClickIdx && (DateTime.UtcNow - _lastClickUtc).TotalMilliseconds < Utils.DoubleClickTimeMs();
                     _lastClickIdx = isDoubleClick ? -1 : imgIndex;
                     _lastClickUtc = DateTime.UtcNow;
                     photoProvider.Idx = imgIndex;
@@ -144,7 +154,11 @@ namespace Photos.Core
                         photoProvider.SelectPhoto();
                 },
                 OnContext = () => ItemContextRequested?.Invoke(photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex),
-                IsHighlighted = { Func = () => SelectedItems.Contains(photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex) },
+                IsHighlighted = { Func = () =>
+                {
+                    var shown = photoProvider.GetFile(photoProvider.DispalyGroups[groupReplicator.CurrentIndex].StartIdx + imgReplicator.CurrentIndex);
+                    return shown != null && SelectedSigs.Contains(shown.Sig);
+                } },
             };
 
             ScrollContainer.ScrollPositionHint = () =>
@@ -165,9 +179,29 @@ namespace Photos.Core
             _dateTimeFormat = _dateTimeFormat.Replace("dddd", "").Replace("dddd", "").Trim(',').Trim();
         }
         public event Action<int> ItemContextRequested;
-        const int DoubleClickMs = 450;
         int _lastClickIdx = -1;
+        int _anchor = -1;
         DateTime _lastClickUtc;
+        /// <summary>Selects every photo in the current view.</summary>
+        public void SelectAll()
+        {
+            foreach (var file in photoProvider.DisplayedFileList)
+                if (file.Sig != 0)
+                    SelectedSigs.Add(file.Sig);
+        }
+
+        /// <summary>Selects the photos between two positions in the current view, inclusive.</summary>
+        public void SelectRange(int from, int to)
+        {
+            var list = photoProvider.DisplayedFileList;
+            for (int i = Math.Min(from, to); i <= Math.Max(from, to) && i < list.Count; i++)
+                if (list[i].Sig != 0)
+                    SelectedSigs.Add(list[i].Sig);
+        }
+
+        /// <summary>The selected photos that are in the current view, in display order.</summary>
+        public IEnumerable<FileRecord> SelectedFiles() => photoProvider.DisplayedFileList.Where(f => SelectedSigs.Contains(f.Sig));
+
         int minImgIdx, maxImgIdx;
         protected override void RouteRenderFrame(SKCanvas ctx)
         {

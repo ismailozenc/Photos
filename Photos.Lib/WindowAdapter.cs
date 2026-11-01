@@ -20,6 +20,7 @@ namespace Photos.Lib
         public Func<SKPoint?> MousePosition;
         public Func<bool> IsBorderless;
         public Func<bool> IsCtrlDown = () => false;
+        public Func<bool> IsShiftDown = () => false;
         public GRContext GR;
         public Func<string, string> OpenUrl;
         public bool ShowGrid;

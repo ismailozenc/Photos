@@ -167,12 +167,10 @@ namespace Photos.Core
 
         public static void Save(Storage db, RankingState state)
         {
-            var settings = db.Settings;
-            if (settings == null)
+            if (db.Settings == null)
                 return;
 
-            settings.Ranking = state;
-            db.Settings = settings;
+            db.UpdateSettings(s => s with { Ranking = state });
         }
     }
 }
