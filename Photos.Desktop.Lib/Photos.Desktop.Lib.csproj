@@ -17,7 +17,7 @@
   <ItemGroup>
     <None Remove="Properties\image_16.png" />
     <None Remove="Properties\image_32.png" />
-    <Content Include="Properties\image_96.png" CopyToOutputDirectory="Always" TargetPath="Icon.png"/>
+    <Content Include="Properties\image_96.png" CopyToOutputDirectory="Always" TargetPath="Icon.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,9 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
-<PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.15.0" />
+<PackageReference Include="Magick.NET-Q8-AnyCPU" Version="15.0.0" />
     <PackageReference Include="OpenTK" Version="4.9.4" />
-    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp" Version="4.154.0" />
   </ItemGroup>
   
   <ItemGroup>
