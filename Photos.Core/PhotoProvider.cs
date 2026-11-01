@@ -320,11 +320,12 @@ namespace Photos.Core
                 var files = GetLibraryFiles(out var dirs);
                 TotalCount = files.Count;
 
-                FilterService.IsHidden = f => IsPrivateHidden(f) || IsFullyTrashed(f) || IsFullyExcluded(f);
+                var visibility = BuildVisibility();
+                FilterService.IsHidden = f => HiddenIn(visibility, f);
                 if (!skipFilters)
                     FilterService.RefreshFilters(files, dirs.Where(x => x != null), initTask != null);
 
-                files = files.Where(f => ShowDeleted ? !IsPrivateHidden(f) && HasTrashedSource(f) : IsInLibrary(f)).ToList(); // the open view: deleted images, or the library
+                files = files.Where(f => ShowDeleted ? !PrivateHiddenIn(visibility, f) && HasTrashedIn(visibility, f) : LibraryIn(visibility, f)).ToList(); // the open view: deleted images, or the library
                 FilterService.FilterFiles(files);
 
                 if (FilterService.CurrentSortMode == SortModeEnum.Filename)
@@ -388,6 +389,7 @@ namespace Photos.Core
                     DispalyGroups = dispalyGroups;
                     ClampIdx(ref _idx);
                     DisplayedCount = _displayOrder.Count;
+                    _displayVersion++;
 
                     SystemUpdates.Enqueue(new UpdateOp() { PreLockAction = () => OnDisplayOrderUpdate?.Invoke() });
                 };
@@ -400,26 +402,69 @@ namespace Photos.Core
             }
         }
 
+        /// <summary>The visibility rules as sets of directory indexes, built once per refresh so each photo costs a few lookups.</summary>
+        sealed class VisibilitySnapshot
+        {
+            public bool Unlocked;
+            public readonly HashSet<int> PrivateDirs = new HashSet<int>();
+            public readonly HashSet<int> ExcludedDirs = new HashSet<int>();
+            public readonly HashSet<(int Dir, string FileName)> Trashed = new HashSet<(int, string)>();
+        }
+
+        VisibilitySnapshot BuildVisibility()
+        {
+            var snap = new VisibilitySnapshot { Unlocked = PrivateUnlocked };
+            var privateIds = PrivateFolderIds;
+            var excludedIds = DB.Settings.ExcludedFolders ?? Array.Empty<string>();
+            var dirs = DB.Directories.ToArray();
+            for (int i = 0; i < dirs.Length; i++)
+            {
+                var d = dirs[i];
+                if (d == null)
+                    continue;
+                var key = $"{d.SourceId}/{d.Directory.ToLowerInvariant()}";
+                if (privateIds.Count > 0 && PrivateFolderRules.IsPrivate(privateIds, key))
+                    snap.PrivateDirs.Add(i);
+                if (excludedIds.Contains(key, StringComparer.OrdinalIgnoreCase))
+                    snap.ExcludedDirs.Add(i);
+            }
+
+            foreach (var trashed in DeletedMap.Keys)
+            {
+                int dirIdx = DB.Directories.GetIndex(new DirectoryRecord() { Directory = Path.GetDirectoryName(trashed), SourceId = 0 }, noAdd: true);
+                if (dirIdx >= 0)
+                    snap.Trashed.Add((dirIdx, Path.GetFileName(trashed)));
+            }
+            return snap;
+        }
+
+        static bool PrivateHiddenIn(VisibilitySnapshot v, FileRecord f) =>
+            !v.Unlocked && v.PrivateDirs.Count > 0 && f.Src.Any(s => v.PrivateDirs.Contains(s.D));
+
+        static bool TrashedIn(VisibilitySnapshot v, SourceRecord s) =>
+            v.Trashed.Count > 0 && v.Trashed.Contains((s.D, s.FN.ToLowerInvariant()));
+
+        static bool ExcludedIn(VisibilitySnapshot v, SourceRecord s) => v.ExcludedDirs.Contains(s.D);
+
+        static bool HasTrashedIn(VisibilitySnapshot v, FileRecord f) => f.Src.Any(s => TrashedIn(v, s));
+
         /// <summary>The library's rule for showing a photo: not private while locked, not moved to deleted images, not in a hidden folder.</summary>
-        public bool IsInLibrary(FileRecord file) => !IsPrivateHidden(file) && !IsFullyTrashed(file) && !IsFullyExcluded(file);
+        static bool LibraryIn(VisibilitySnapshot v, FileRecord f) =>
+            !PrivateHiddenIn(v, f) && !f.Src.All(s => TrashedIn(v, s)) && !f.Src.All(s => ExcludedIn(v, s));
+
+        static bool HiddenIn(VisibilitySnapshot v, FileRecord f) =>
+            PrivateHiddenIn(v, f) || f.Src.All(s => TrashedIn(v, s)) || f.Src.All(s => ExcludedIn(v, s));
+
+        /// <summary>The files the library shows, under the same rules as the grid. The rules are built once for the whole list.</summary>
+        public List<FileRecord> LibraryFiles(IEnumerable<FileRecord> files)
+        {
+            var visibility = BuildVisibility();
+            return files.Where(f => LibraryIn(visibility, f)).ToList();
+        }
 
         /// <summary>True when the folder itself is hidden from browse and slideshows (subfolders are not affected).</summary>
         public bool IsExcludedFolder(string folderId) =>
             (DB.Settings.ExcludedFolders ?? Array.Empty<string>()).Contains(folderId, StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>True when this copy lies directly in a folder hidden from browse and slideshows.</summary>
-        public bool IsExcludedSource(SourceRecord s)
-        {
-            if (!IsAnyExcludedFolder)
-                return false;
-            var dir = DB.Directories.GetValue(s.D);
-            return dir != null && IsExcludedFolder($"{dir.SourceId}/{dir.Directory.ToLowerInvariant()}");
-        }
-
-        bool IsAnyExcludedFolder => (DB.Settings.ExcludedFolders?.Length ?? 0) > 0;
-
-        /// <summary>A photo is hidden only when every copy is in a hidden folder.</summary>
-        public bool IsFullyExcluded(FileRecord file) => file.Src.All(IsExcludedSource);
 
         /// <summary>Hides or shows several folders in browse and slideshows, with one settings save and one refresh.</summary>
         public void SetFoldersExcluded(IEnumerable<string> folderIds, bool excluded)
@@ -467,12 +512,6 @@ namespace Photos.Core
             var map = DeletedMap;
             return map.Count > 0 && map.ContainsKey(DB.Directories.GetValue(s.D).CombinePath(s).ToLowerInvariant());
         }
-
-        /// <summary>A photo is hidden from the library only when every copy is in the deleted-images folder.</summary>
-        public bool IsFullyTrashed(FileRecord file) => file.Src.All(IsTrashedSource);
-
-        /// <summary>True when at least one copy is in the deleted-images folder.</summary>
-        public bool HasTrashedSource(FileRecord file) => file.Src.Any(IsTrashedSource);
 
         /// <summary>Indexes of the copies the current view can act on: local copies that are trashed in the deleted view, and not trashed otherwise.</summary>
         public IEnumerable<int> ActionableSources(FileRecord file)
@@ -621,18 +660,6 @@ namespace Photos.Core
         public IReadOnlyList<string> PrivateFolderIds => DB.Settings.PrivateFolders ?? Array.Empty<string>();
 
         public bool HasPrivateFolders => PrivateFolderIds.Count > 0;
-
-        /// <summary>True when a file must not be shown: it lies in a private folder and the session is locked.</summary>
-        public bool IsPrivateHidden(FileRecord file)
-        {
-            if (PrivateUnlocked || !HasPrivateFolders)
-                return false;
-            return file.Src.Any(s =>
-            {
-                var dir = DB.Directories.GetValue(s.D);
-                return dir != null && PrivateFolderRules.IsPrivate(PrivateFolderIds, $"{dir.SourceId}/{dir.Directory.ToLowerInvariant()}");
-            });
-        }
 
         public bool TryUnlockPrivate(string password)
         {
@@ -828,6 +855,9 @@ namespace Photos.Core
         }        
 
         public int DisplayedCount, TotalCount;
+        volatile int _displayVersion;
+        /// <summary>Changes every time the display order is rebuilt, so views can rebuild their rows only when needed.</summary>
+        public int DisplayVersion => _displayVersion;
         public bool IsInitRunning => !initTask.IsCompleted;
         internal bool IsIndexEmpty => DB.Count == 0 && initTask.IsCompleted;
 

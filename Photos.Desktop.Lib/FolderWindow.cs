@@ -26,10 +26,9 @@ namespace Photos.Desktop
         const float Padding = 14;
         const float IndentStep = 16;
         const float MenuWidth = 280;
-        const int RefreshMs = 250;
 
         readonly PhotoProvider _provider;
-        readonly Stopwatch _refreshTimer = Stopwatch.StartNew();
+        int _rowsVersion = -1;
         FileFilterGroup _group;
         List<FileFilter> _rows = new List<FileFilter>();
         int _cursor;
@@ -52,14 +51,14 @@ namespace Photos.Desktop
 
         protected override void Advance()
         {
-            if (_rows.Count > 0 && _refreshTimer.ElapsedMilliseconds < RefreshMs)
-                return;
-
-            _refreshTimer.Restart();
-            _group = _provider.FilterService.FilterGroups.FirstOrDefault(g => g.GroupId == FilterService.FolderFilter);
-            _rows = _group?.Filters.Values.OrderBy(f => f.PreText).ThenBy(f => f.Text).ToList() ?? new List<FileFilter>();
-            _cursor = Math.Clamp(_cursor, 0, Math.Max(0, _rows.Count - 1));
-            _scroll = Math.Clamp(_scroll, 0, MaxScroll(ClientSize.Y));
+            if (_rowsVersion != _provider.DisplayVersion)
+            {
+                _rowsVersion = _provider.DisplayVersion;
+                _group = _provider.FilterService.FilterGroups.FirstOrDefault(g => g.GroupId == FilterService.FolderFilter);
+                _rows = _group?.Filters.Values.OrderBy(f => f.PreText).ThenBy(f => f.Text).ToList() ?? new List<FileFilter>();
+                _cursor = Math.Clamp(_cursor, 0, Math.Max(0, _rows.Count - 1));
+                _scroll = Math.Clamp(_scroll, 0, MaxScroll(ClientSize.Y));
+            }
 
             if (_countTask != null && _countTask.IsCompleted)
             {
@@ -217,31 +216,49 @@ namespace Photos.Desktop
             }
         }
 
-        /// <summary>Counts every file with a known image extension in each folder, including subfolders.</summary>
+        /// <summary>
+        /// Counts the known image files under each listed folder, including subfolders. Each top-level folder is
+        /// walked once, and every file is added to each listed folder above it, so a deep library is read once.
+        /// </summary>
         static Dictionary<string, int> CountImageFiles(List<(string Id, string Dir)> dirs)
         {
             var result = new Dictionary<string, int>();
+            var idByDir = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var item in dirs)
             {
-                int count = -1; // stays -1 if the folder cannot be read
+                result[item.Id] = 0;
+                idByDir[item.Dir.TrimEnd('\\', '/')] = item.Id;
+            }
+
+            var roots = idByDir.Keys.Where(d => !idByDir.Keys.Any(o => o != d && IsInside(d, o))).ToList();
+            foreach (var root in roots)
+            {
                 try
                 {
-                    count = 0;
-                    if (Directory.Exists(item.Dir))
-                        foreach (var file in Directory.EnumerateFiles(item.Dir, "*", SearchOption.AllDirectories))
-                            if (ImageLoader.KnownEndings.Contains(Path.GetExtension(file).ToLowerInvariant()))
-                                count++;
+                    if (!Directory.Exists(root))
+                        continue;
+                    foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+                    {
+                        if (!ImageLoader.KnownEndings.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                            continue;
+                        for (var dir = Path.GetDirectoryName(file); dir != null && dir.Length >= root.Length; dir = Path.GetDirectoryName(dir))
+                            if (idByDir.TryGetValue(dir, out var id))
+                                result[id]++;
+                    }
                 }
-                catch (Exception) { }
-                result[item.Id] = count;
+                catch (Exception)
+                {
+                    // unreadable folder: every listed folder under it shows as unknown
+                    foreach (var pair in idByDir)
+                        if (pair.Key == root || IsInside(pair.Key, root))
+                            result[pair.Value] = -1;
+                }
             }
             return result;
         }
 
-        /// <summary>True when the folder is highlighted: its filter is on, or it is the deleted-images folder while that view is open.</summary>
-        bool IsSelectedFolder(FileFilter row) => _provider.TrashFolderIds.Contains(row.Id)
-            ? _provider.ShowDeleted
-            : _group != null && _provider.FilterService.IsFilterActive(_group, row);
+        static bool IsInside(string dir, string parent) =>
+            dir.Length > parent.Length && dir.StartsWith(parent, StringComparison.OrdinalIgnoreCase) && (dir[parent.Length] == '\\' || dir[parent.Length] == '/');
 
         bool IsPrivateRow(string id) => PrivateFolderRules.IsPrivate(_provider.PrivateFolderIds, id);
 

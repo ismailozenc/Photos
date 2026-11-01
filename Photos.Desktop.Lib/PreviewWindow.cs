@@ -56,18 +56,22 @@ namespace Photos.Desktop
             int position = Math.Clamp(_provider.Idx, 0, _provider.DisplayedCount - 1) + 1;
             _caption = $"{position} / {_provider.DisplayedCount}   {file.Src.FirstOrDefault().FN}";
 
-            var data = _provider.Indexer.GetFullImage(file); // the file is read here; decoding happens off this thread
             int side = Math.Min(ClientSize.X, ClientSize.Y);
-            _loader.Request(() =>
-            {
-                if (data == null)
-                    return null;
-                using (data)
-                {
-                    ImageLoader.DecodeAndResizeImage(data, ImageLoader.ScaleToMinSide(side, side));
-                    return data.Bitmap == null ? null : SKImage.FromBitmap(data.Bitmap);
-                }
-            });
+            if (!_loader.TryPromote(file))
+                _loader.Request(AsyncImage.Decoder(_provider.Indexer.GetFullImage(file), side)); // the file is read here; decoding is off this thread
+            PrefetchNeighbour(1, side);
+        }
+
+        /// <summary>Starts decoding the photo next to the current one, so moving to it is immediate.</summary>
+        void PrefetchNeighbour(int step, int side)
+        {
+            int count = _provider.DisplayedCount;
+            if (count < 2)
+                return;
+            var next = _provider.GetFile(((_provider.Idx + step) % count + count) % count);
+            if (next == null || _loader.IsPrefetching(next))
+                return;
+            _loader.Prefetch(next, AsyncImage.Decoder(_provider.Indexer.GetFullImage(next), side));
         }
 
         protected override void DrawFrame(SKCanvas canvas, int width, int height)

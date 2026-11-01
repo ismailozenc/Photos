@@ -107,6 +107,8 @@ namespace Photos.Core
 
         public event Action<SettingsRecord, SettingsRecord> OnSettingsUpdate;
         readonly object _settingsLock = new object();
+        const int SettingsSaveDelayMs = 500;
+        System.Threading.Timer _settingsTimer;
 
         public SettingsRecord Settings
         {
@@ -129,9 +131,25 @@ namespace Photos.Core
             }
         }
 
+        /// <summary>Saves the settings shortly after the last change; rapid changes such as slider drags share one write.</summary>
         public void SaveSettings()
         {
-            Save(_settingsFileName, Settings);
+            lock (_settingsLock)
+            {
+                _settingsTimer ??= new System.Threading.Timer(_ => FlushSettings(), null,
+                    System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+                _settingsTimer.Change(SettingsSaveDelayMs, System.Threading.Timeout.Infinite);
+            }
+        }
+
+        /// <summary>Writes the settings now. Called by the delayed save and when the library closes.</summary>
+        public void FlushSettings()
+        {
+            lock (_settingsLock)
+            {
+                _settingsTimer?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+                Save(_settingsFileName, settings);
+            }
         }
 
         internal void RemoveMissingSources(List<FileRecord> newFiles, bool protectUnreadableFolders, List<string> builtInFolders)
@@ -290,6 +308,9 @@ namespace Photos.Core
 
         public void Dispose()
         {
+            FlushSettings();
+            lock (_settingsLock)
+                _settingsTimer?.Dispose();
             Thumbnails.Dispose();
             MicroThumbnails.Dispose();
         }
