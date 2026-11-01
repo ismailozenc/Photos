@@ -30,7 +30,6 @@
 <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="15.0.0" />
     <PackageReference Include="OpenTK" Version="4.9.4" />
     <PackageReference Include="SkiaSharp" Version="4.154.0" />
-    <PackageReference Include="xunit.v3" Version="4.0.2" />
   </ItemGroup>
   
   <ItemGroup>
