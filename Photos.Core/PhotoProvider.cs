@@ -108,6 +108,7 @@ namespace Photos.Core
 
             FilterService = new(DB);
             PruneDeletedOriginals();
+            RefreshWatchers();
             FilterService.FilterUpdate += () => EnqueueRefreshDisplayOrder(true);
 
             Indexer.IndexUpdateRequest += () => {
@@ -254,6 +255,66 @@ namespace Photos.Core
         //const int WorkStatusDelay = 1000;
         public event Action OnDisplayOrderUpdate;
 
+        readonly List<FileSystemWatcher> _watchers = new List<FileSystemWatcher>();
+        System.Threading.Timer _watchDebounce;
+        volatile bool _diskChanged;
+
+        /// <summary>True once after the library folders changed on disk. The host then rescans on its render thread.</summary>
+        public bool TakeDiskChange()
+        {
+            if (!_diskChanged)
+                return false;
+            _diskChanged = false;
+            return true;
+        }
+
+        /// <summary>Watches the library folders, so new and removed photos are picked up without "Check for new photos".</summary>
+        void RefreshWatchers()
+        {
+            DisposeWatchers();
+            foreach (var dir in GetDirs())
+            {
+                if (!Directory.Exists(dir))
+                    continue;
+                try
+                {
+                    var watcher = new FileSystemWatcher(dir)
+                    {
+                        IncludeSubdirectories = true,
+                        NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                    };
+                    watcher.Created += OnDiskChanged;
+                    watcher.Deleted += OnDiskChanged;
+                    watcher.Renamed += OnDiskChanged;
+                    watcher.Changed += OnDiskChanged;
+                    watcher.EnableRaisingEvents = true;
+                    _watchers.Add(watcher);
+                }
+                catch (Exception ex)
+                {
+                    Utils.LogError(ex);
+                }
+            }
+        }
+
+        /// <summary>Several events arrive for one change; the rescan waits three seconds after the last one.</summary>
+        void OnDiskChanged(object sender, FileSystemEventArgs e)
+        {
+            lock (_watchers)
+            {
+                _watchDebounce ??= new System.Threading.Timer(_ => _diskChanged = true, null,
+                    System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+                _watchDebounce.Change(3000, System.Threading.Timeout.Infinite);
+            }
+        }
+
+        void DisposeWatchers()
+        {
+            foreach (var watcher in _watchers)
+                watcher.Dispose();
+            _watchers.Clear();
+        }
+
         /// <summary>Drops deleted-image entries whose trashed file no longer exists, e.g. removed or moved outside the app.</summary>
         void PruneDeletedOriginals()
         {
@@ -272,12 +333,14 @@ namespace Photos.Core
                 return;
 
             DB.UpdateSettings(s => s with { Dirs = s.Dirs.AddToArr(path) });
+            RefreshWatchers();
 
             RestartBackgroundTasks(null, new IndexTaskConfig() { ForceRefreshDisplayAfterIndex = true });
         }
         public void RemoveDir(string d)
         {
             DB.UpdateSettings(s => s with { Dirs = s.Dirs.Where(x => x != d).ToArray() });
+            RefreshWatchers();
 
             EnqueueRefreshDisplayOrder();
             RestartBackgroundTasks(null);
@@ -882,6 +945,7 @@ namespace Photos.Core
 
         public void Dispose()
         {
+            DisposeWatchers();
             TerminateIndexerTask();
             _shutdown = true;
             backgroundLoaderTask?.Wait();
@@ -893,6 +957,8 @@ namespace Photos.Core
 
         public int DisplayedCount, TotalCount;
         volatile int _displayVersion;
+        /// <summary>The photos on display, in order.</summary>
+        public IReadOnlyList<FileRecord> DisplayedFileList => _displayOrder;
         /// <summary>Changes every time the display order is rebuilt, so views can rebuild their rows only when needed.</summary>
         public int DisplayVersion => _displayVersion;
         public bool IsInitRunning => !initTask.IsCompleted;

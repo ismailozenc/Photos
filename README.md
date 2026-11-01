@@ -8,8 +8,8 @@ Reviewed at commit `0687b1e` ("csv removed"): 72 tracked files, 46 C# files, abo
 
 | Area | Count | Most important |
 | --- | --- | --- |
-| User experience | 6 | Selection has no range select or select-all |
-| Feature upgrades | 10 | Shift-click range select, duplicate finder |
+| User experience | 1 | Monitor roles |
+| Feature upgrades | 7 | Duplicate finder view |
 | Security, build, packaging | 5 | Private folders are UI-only; password in source |
 
 ## User experience improvements
@@ -18,11 +18,6 @@ Most gaps are about selection and the multi-monitor windows, which were added qu
 
 | Area | Improvement |
 | --- | --- |
-| Selection | Shift-click for ranges, Ctrl+A to select all, Escape to clear, and a visible "N selected" count with a clear button. |
-| Selection | Keep the selection across refreshes by storing photo signatures, not grid positions. |
-| Folder list | Collapse and expand subfolders; long libraries are a flat list today. |
-| Deleted images | Show the count on the folder row. |
-| Private folders | Lock again automatically after idle time or when the app is minimised. |
 | Monitor roles | Let users pick which screen is main, folders and preview, instead of guessing from shape; remember the choice per display. |
 
 ## Feature upgrades
@@ -33,12 +28,9 @@ The best-value upgrades build on data the app already has: signatures for duplic
 | --- | --- | --- |
 | Duplicate finder view | Small | Copies are already one record with several sources; list photos with 2+ copies and offer "keep one". |
 | Rating stars on thumbnails and a rating filter | Small | Ratings are stored but only visible in the photo view. |
-| Shift-click range select and Ctrl+A | Small | Completes multi-select. |
 | Slideshow settings: interval, order (folder, date, random), transition | Medium | Interval and order are fixed today. |
 | Copy or move selection to a folder | Medium | Replaces the copy-to-clipboard button that was removed. |
 | Drag photos out to Explorer | Medium | Common expectation on Windows. |
-| Automatic rescan with `FileSystemWatcher` | Medium | New files appear without "Check for new photos". |
-| Camera RAW (`.cr2`, `.nef`, `.arw`, `.raf`) via Magick.NET | Medium | Magick.NET is already a dependency. |
 | Configurable private-folder password (hashed) | Small | See Security. |
 | Folder roles and layouts saved per monitor set | Medium | Home and office monitor setups differ. |
 
@@ -58,5 +50,4 @@ Remaining work, in priority order.
 
 - [ ] Hashed, changeable private password; auto-lock
 - [ ] Update NuGet packages; rewrite the README
-- [ ] Shift-click, Ctrl+A, Escape for selection
 - [ ] Duplicate finder view

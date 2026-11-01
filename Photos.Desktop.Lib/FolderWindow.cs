@@ -35,6 +35,10 @@ namespace Photos.Desktop
         float _scroll;
         readonly Dictionary<string, int> _totals = new Dictionary<string, int>(); // -1 = unknown
         Task<Dictionary<string, int>> _countTask;
+        readonly HashSet<string> _collapsed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        List<FileFilter> _visible = new List<FileFilter>();
+        HashSet<string> _parents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int _deletedCount;
 
         bool _menuOpen;
         float _menuX, _menuY;
@@ -56,7 +60,9 @@ namespace Photos.Desktop
                 _rowsVersion = _provider.DisplayVersion;
                 _group = _provider.FilterService.FilterGroups.FirstOrDefault(g => g.GroupId == FilterService.FolderFilter);
                 _rows = _group?.Filters.Values.OrderBy(f => f.PreText).ThenBy(f => f.Text).ToList() ?? new List<FileFilter>();
-                _cursor = Math.Clamp(_cursor, 0, Math.Max(0, _rows.Count - 1));
+                _deletedCount = _provider.DeletedCopyCount;
+                RebuildVisible();
+                _cursor = Math.Clamp(_cursor, 0, Math.Max(0, _visible.Count - 1));
                 _scroll = Math.Clamp(_scroll, 0, MaxScroll(ClientSize.Y));
             }
 
@@ -119,13 +125,13 @@ namespace Photos.Desktop
             canvas.Save();
             canvas.ClipRect(SKRect.Create(0, HeaderHeight, width, height - HeaderHeight));
 
-            for (int i = 0; i < _rows.Count; i++)
+            for (int i = 0; i < _visible.Count; i++)
             {
                 float top = HeaderHeight + i * RowHeight - _scroll;
                 if (top + RowHeight < HeaderHeight || top > height)
                     continue;
 
-                var row = _rows[i];
+                var row = _visible[i];
                 bool selectedFolder = IsSelectedFolder(row);
                 if (selectedFolder)
                     canvas.DrawRect(SKRect.Create(0, top, width, RowHeight), folderPaint);
@@ -135,6 +141,8 @@ namespace Photos.Desktop
                 string rel = row.Text.Trim().Trim('\\', '/');
                 int depth = rel.Count(c => c == '\\' || c == '/');
                 string name = rel.Length == 0 ? "<root>" : rel.Split('\\', '/').Last();
+                if (_provider.TrashFolderIds.Contains(row.Id))
+                    name += $" ({_deletedCount})";
 
                 bool isPrivate = IsPrivateRow(row.Id);
                 bool active = _provider.TrashFolderIds.Contains(row.Id) ? _provider.ShowDeleted : _group != null && _provider.FilterService.IsFilterActive(_group, row);
@@ -146,7 +154,13 @@ namespace Photos.Desktop
                 if (allHidden)
                     name += " (all hidden)";
                 var namePaint = isPrivate ? privatePaint : excluded || allHidden ? excludedPaint : active ? activePaint : textPaint;
-                canvas.DrawText(name, Padding + depth * IndentStep, baseline, font, namePaint);
+                float indent = Padding + depth * IndentStep;
+                if (_parents.Contains(row.Id))
+                {
+                    canvas.DrawText(_collapsed.Contains(row.Id) ? "+" : "-", indent, baseline, font, countPaint);
+                    indent += IndentStep;
+                }
+                canvas.DrawText(name, indent, baseline, font, namePaint);
 
                 // shown / total known images; the part that is not shown is drawn in colour
                 int shown = row.Count;
@@ -267,7 +281,27 @@ namespace Photos.Desktop
 
         bool IsPrivateRow(string id) => PrivateFolderRules.IsPrivate(_provider.PrivateFolderIds, id);
 
-        float MaxScroll(int clientHeight) => Math.Max(0, _rows.Count * RowHeight - (clientHeight - HeaderHeight));
+        /// <summary>The rows that are shown: a folder under a collapsed folder is hidden. Also finds the folders that have subfolders.</summary>
+        void RebuildVisible()
+        {
+            _parents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in _rows)
+                if (_rows.Any(other => IsChildOf(other.Id, row.Id)))
+                    _parents.Add(row.Id);
+            _visible = _rows.Where(r => !_collapsed.Any(c => IsChildOf(r.Id, c))).ToList();
+        }
+
+        /// <summary>True when the folder id lies inside the parent folder. A source root ("0/") holds every folder of that source.</summary>
+        static bool IsChildOf(string id, string parent)
+        {
+            if (id.Length <= parent.Length || !id.StartsWith(parent, StringComparison.OrdinalIgnoreCase))
+                return false;
+            return parent.EndsWith('/') || id[parent.Length] == '\\' || id[parent.Length] == '/';
+        }
+
+        static int DepthOf(FileFilter row) => row.Text.Trim().Trim('\\', '/').Count(c => c == '\\' || c == '/');
+
+        float MaxScroll(int clientHeight) => Math.Max(0, _visible.Count * RowHeight - (clientHeight - HeaderHeight));
 
         void EnsureCursorVisible()
         {
@@ -282,16 +316,17 @@ namespace Photos.Desktop
 
         void Toggle(int index)
         {
-            if (index >= 0 && index < _rows.Count && _provider.TrashFolderIds.Contains(_rows[index].Id))
+            if (index < 0 || index >= _visible.Count)
+                return;
+            var row = _visible[index];
+            if (_provider.TrashFolderIds.Contains(row.Id))
             {
                 _provider.SetShowDeleted(!_provider.ShowDeleted);
                 return;
             }
-            if (_group == null || index < 0 || index >= _rows.Count)
-                return;
-            if (_rows[index].Count == 0)
+            if (_group == null || row.Count == 0)
                 return; // every photo in this folder is hidden, so there is nothing to show
-            _provider.FilterService.ToggleFilters(_group, _rows[index]);
+            _provider.FilterService.ToggleFilters(_group, row);
         }
 
         int RowAt(float y)
@@ -299,7 +334,7 @@ namespace Photos.Desktop
             if (y < HeaderHeight)
                 return -1;
             int index = (int)((y - HeaderHeight + _scroll) / RowHeight);
-            return index >= 0 && index < _rows.Count ? index : -1;
+            return index >= 0 && index < _visible.Count ? index : -1;
         }
 
         int MenuItemAt(float x, float y)
@@ -318,7 +353,7 @@ namespace Photos.Desktop
                 return;
 
             _cursor = index;
-            _menuItems = BuildMenu(_rows[index]);
+            _menuItems = BuildMenu(_visible[index]);
             float height = _menuItems.Count * RowHeight + 8;
             _menuX = Math.Max(0, Math.Min(x, ClientSize.X - MenuWidth));
             _menuY = Math.Max(0, Math.Min(y, ClientSize.Y - height));
@@ -389,7 +424,7 @@ namespace Photos.Desktop
                     EnsureCursorVisible();
                     break;
                 case Keys.Down:
-                    _cursor = Math.Min(Math.Max(0, _rows.Count - 1), _cursor + 1);
+                    _cursor = Math.Min(Math.Max(0, _visible.Count - 1), _cursor + 1);
                     EnsureCursorVisible();
                     break;
                 case Keys.Enter:
@@ -427,6 +462,16 @@ namespace Photos.Desktop
                 return;
 
             _cursor = index;
+            var row = _visible[index];
+            float arrowX = Padding + DepthOf(row) * IndentStep;
+            if (_parents.Contains(row.Id) && x >= arrowX - 4 && x <= arrowX + IndentStep)
+            {
+                if (!_collapsed.Remove(row.Id))
+                    _collapsed.Add(row.Id);
+                RebuildVisible();
+                _cursor = Math.Clamp(_cursor, 0, Math.Max(0, _visible.Count - 1));
+                return;
+            }
             Toggle(index);
         }
 

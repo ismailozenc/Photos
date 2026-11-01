@@ -132,8 +132,9 @@ namespace Photos.Core
             if (clicked == null || !clicked.IsIndexed())
                 return;
 
-            var indexes = ThumbnailView.SelectedItems.Contains(idx) ? ThumbnailView.SelectedItems.OrderBy(x => x).ToList() : new List<int> { idx };
-            var files = indexes.Select(i => photoProvider.GetFile(i)).Where(f => f != null && f.IsIndexed()).ToList();
+            var files = ThumbnailView.SelectedSigs.Contains(clicked.Sig)
+                ? ThumbnailView.SelectedFiles().Where(f => f.IsIndexed()).ToList()
+                : new List<FileRecord> { clicked };
             var items = new List<MenuItem>();
 
             if (files.Count == 1)

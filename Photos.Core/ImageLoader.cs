@@ -13,7 +13,7 @@ namespace Photos.Core
     public class ImageLoader
     {
         public static readonly List<Action<FullImageData>> ImageLoaderList = new();
-        public static readonly List<string> KnownEndings = [".jpg", ".jpeg", ".gif", ".webp", ".heic", ".png", ".bmp", ".dng"];
+        public static readonly List<string> KnownEndings = [".jpg", ".jpeg", ".gif", ".webp", ".heic", ".png", ".bmp", ".dng", ".cr2", ".cr3", ".nef", ".arw", ".raf", ".orf", ".rw2"];
 
 
         public static void DecodeAndResizeImage(FullImageData imgData, Func<SKImageInfo, bool, float> scaler)
